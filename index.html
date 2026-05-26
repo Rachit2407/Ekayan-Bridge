@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Ekayan Bridge — Student Lifecycle Management System. Track every student from enrollment to alumni.">
+  <title>Ekayan Bridge — Student Tracker</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__logo">
+        <div class="sidebar__logo-icon">🎓</div>
+        <div class="sidebar__logo-text"><span>Ekayan</span> Bridge</div>
+      </div>
+
+      <nav class="sidebar__nav">
+        <button class="nav-item nav-item--active" data-view="dashboard">
+          <span class="nav-item__icon">📊</span> Dashboard
+        </button>
+        <button class="nav-item" data-view="students">
+          <span class="nav-item__icon">👥</span> Students
+          <span class="nav-item__badge" id="flag-badge" style="display:none;">0</span>
+        </button>
+
+        <div style="flex:1;"></div>
+
+        <button class="nav-item" onclick="DataStore.exportData()" id="nav-export">
+          <span class="nav-item__icon">📤</span> Export Data
+        </button>
+        <button class="nav-item" onclick="document.getElementById('import-file').click()" id="nav-import">
+          <span class="nav-item__icon">📥</span> Import Data
+        </button>
+        <input type="file" id="import-file" accept=".json" style="display:none;"
+          onchange="DataStore.importData(this.files[0]).then(() => { App.navigate('dashboard'); this.value=''; })">
+        <button class="nav-item nav-item--logout" onclick="App.handleLogout()" style="margin-top:8px;">
+          <span class="nav-item__icon">🚪</span> Sign Out
+        </button>
+      </nav>
+
+      <div class="sidebar__footer">
+        <div id="user-profile-badge" style="margin-bottom:12px; display:flex; flex-direction:column; gap:4px; align-items:center;">
+          <div id="user-email" style="font-size:0.8rem; color:var(--text-secondary); font-weight:500;"></div>
+          <div id="user-role" class="badge"></div>
+        </div>
+        <div style="font-size:0.75rem; color:var(--text-muted); text-align:center;">
+          Ekayan Bridge v1.0<br>
+          <span style="opacity:0.6;">Data stored locally</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main">
+      <header class="topbar">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <button class="sidebar-toggle" id="sidebar-toggle">☰</button>
+          <h1 class="topbar__title" id="topbar-title">📊 Dashboard</h1>
+        </div>
+        <div class="topbar__actions">
+          <button class="btn btn--primary btn--sm" onclick="Forms.showAddStudent()">+ Add Student</button>
+        </div>
+      </header>
+
+      <div class="content" id="app-content">
+        <!-- Views render here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Login Screen -->
+  <div class="login-overlay" id="login-overlay" style="display:none;">
+    <div class="login-card">
+      <div class="login-card__header">
+        <div class="login-card__logo">🎓</div>
+        <h2 class="login-card__title">Ekayan Bridge</h2>
+        <p class="login-card__subtitle">Student Lifecycle System</p>
+      </div>
+      <form id="login-form" onsubmit="App.handleLogin(event)">
+        <div id="login-error" style="display:none; color:var(--danger); background:rgba(255,71,87,0.1); border:1px solid rgba(255,71,87,0.2); padding:10px; border-radius:8px; font-size:0.85rem; margin-bottom:16px; text-align:center; font-weight:500;">
+          Incorrect email or password.
+        </div>
+        <div class="form-group">
+          <label style="color:var(--text-secondary); font-weight:500; font-size:0.85rem; display:block; margin-bottom:6px;">Email Address</label>
+          <input type="email" id="login-email" required placeholder="e.g. admin@ekayan.org" style="width:100%; padding:10px 12px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; color:var(--text-primary); font-size:0.9rem;">
+        </div>
+        <div class="form-group" style="margin-top:16px;">
+          <label style="color:var(--text-secondary); font-weight:500; font-size:0.85rem; display:block; margin-bottom:6px;">Password</label>
+          <input type="password" id="login-password" required placeholder="••••••••" style="width:100%; padding:10px 12px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; color:var(--text-primary); font-size:0.9rem;">
+        </div>
+        <button type="submit" class="btn btn--primary" style="margin-top:24px; width:100%; padding:12px; font-size:1rem; font-weight:600; display:flex; justify-content:center; align-items:center;">Sign In</button>
+      </form>
+      <div class="login-card__help" style="margin-top:24px; border-top:1px solid rgba(255,255,255,0.1); padding-top:16px; font-size:0.8rem; color:var(--text-muted); line-height:1.6;">
+        <p style="font-weight:600; color:var(--text-secondary); margin-bottom:6px;">Demo Credentials:</p>
+        <div>🔑 admin@ekayan.org / admin123 (Admin)</div>
+        <div>🔑 staff@ekayan.org / staff123 (Staff)</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <!-- Scripts (order matters) -->
+  <script src="js/utils.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/students.js"></script>
+  <script src="js/profile.js"></script>
+  <script src="js/forms.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
