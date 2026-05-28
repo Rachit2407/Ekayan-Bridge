@@ -47,6 +47,7 @@ const Profile = (() => {
         <div class="profile-header__actions">
           <button class="btn btn--primary btn--sm" onclick="Forms.showAddEvent('${student.id}')">+ Add Event</button>
           <button class="btn btn--sm" onclick="Forms.showEditStudent('${student.id}')">✏️ Edit</button>
+          <button class="btn btn--sm ${student.followUpRequired ? 'btn--warning' : ''}" onclick="Forms.showFollowUpModal('${student.id}')">⚠️ Follow-Up</button>
           <button class="btn btn--sm" onclick="Profile.toggleFlag('${student.id}')">${student.flagged ? '🚩 Unflag' : '🏳️ Flag'}</button>
           <button class="btn btn--sm" onclick="Forms.showChangeStage('${student.id}')">🔄 Stage</button>
           ${isAdmin ? `<button class="btn btn--danger btn--sm" onclick="Profile.confirmDelete('${student.id}')">🗑️</button>` : ''}
@@ -60,7 +61,19 @@ const Profile = (() => {
         <div class="profile-stat"><div class="profile-stat__value">${Utils.timeAgo(student.lastContactDate) || '—'}</div><div class="profile-stat__label">Last Contact</div></div>
       </div>
 
-      ${student.flagged ? `<div class="alert-item" style="margin-bottom:20px;"><span class="alert-item__icon">🚩</span><span class="alert-item__text"><strong>Flagged:</strong> ${Utils.escapeHtml(student.flagReason || 'Needs follow-up')}</span></div>` : ''}
+      ${student.flagged ? `<div class="alert-item" style="margin-bottom:12px;"><span class="alert-item__icon">🚩</span><span class="alert-item__text"><strong>Flagged:</strong> ${Utils.escapeHtml(student.flagReason || 'Needs follow-up')}</span></div>` : ''}
+
+      ${student.followUpRequired ? `
+        <div class="alert-item" style="margin-bottom:20px; border-left: 4px solid var(--warning); background: rgba(253, 203, 110, 0.1);">
+          <span class="alert-item__icon">⚠️</span>
+          <span class="alert-item__text" style="color: var(--text-primary);">
+            <strong>Follow-Up Required:</strong> ${Utils.escapeHtml(student.followUpNotes || 'No notes provided.')}<br>
+            <span style="font-size:0.8rem; color:var(--text-secondary); margin-top:4px; display:block;">
+              Assigned to: <strong>${Utils.escapeHtml(student.followUpAssignedTo || 'Unassigned')}</strong> | Target Date: <strong>${Utils.formatDate(student.followUpDate)}</strong>
+            </span>
+          </span>
+        </div>
+      ` : ''}
 
       <div class="profile-grid">
         <div>
@@ -72,19 +85,20 @@ const Profile = (() => {
         </div>
         <div>
           ${renderInfoPanel(student)}
+          ${renderAssessmentsPanel(student)}
         </div>
       </div>
     `;
   }
 
   function renderJourneyMap(student) {
-    const stages = ['enrolled', 'active', 'on_hold', 'completed', 'alumni'];
+    const stages = ['enrolled', 'neev', 'disha', 'nirmaan', 'sampark'];
     const currentIndex = stages.indexOf(student.programStage);
     const isDropped = student.programStage === 'dropped_out';
 
     let html = '<div class="journey-map">';
     stages.forEach((stage, i) => {
-      const info = Utils.STAGES[stage];
+      const info = Utils.STAGES[stage] || { label: stage, color: '#888', icon: '📋' };
       let cls = 'journey-step';
       if (isDropped) {
         cls += i === 0 ? ' journey-step--completed' : '';
@@ -154,13 +168,56 @@ const Profile = (() => {
         </div>
       </div>
 
-      ${student.programStage === 'alumni' ? `
-      <div class="info-panel">
-        <div class="section-header" style="margin-top:0;"><div class="section-header__title">🎓 Alumni Outcome</div></div>
+      ${student.programStage === 'sampark' ? `
+      <div class="info-panel" style="margin-bottom:20px;">
+        <div class="section-header" style="margin-top:0;"><div class="section-header__title">🤝 Alumni Outcome</div></div>
         <div class="info-row"><span class="info-row__label">Outcome</span><span class="info-row__value">${Utils.escapeHtml(student.alumniStatus?.outcome || '—')}</span></div>
         <div class="info-row"><span class="info-row__label">Details</span><span class="info-row__value">${Utils.escapeHtml(student.alumniStatus?.details || '—')}</span></div>
       </div>` : ''}
     `;
+  }
+
+  function renderAssessmentsPanel(student) {
+    const assessments = student.assessments || [];
+    const sorted = [...assessments].sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    let html = `
+      <div class="info-panel" style="margin-bottom:20px;">
+        <div class="section-header" style="margin-top:0; display:flex; justify-content:space-between; align-items:center;">
+          <div class="section-header__title">📝 Assessments</div>
+          <button class="btn btn--primary btn--sm" onclick="Forms.showAddAssessment('${student.id}')">+ Add</button>
+        </div>
+    `;
+    
+    if (sorted.length === 0) {
+      html += `<div style="color:var(--text-secondary); font-size:0.85rem; padding:8px 0;">No assessment reports recorded yet.</div>`;
+    } else {
+      html += `<div class="assessments-list" style="display:flex; flex-direction:column; gap:12px; margin-top:8px;">`;
+      sorted.forEach(asm => {
+        html += `
+          <div class="assessment-item" style="border-left: 3px solid var(--primary); padding-left:10px; padding-bottom:8px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+               <div style="font-weight:600; font-size:0.9rem; color:var(--text-primary);">${Utils.escapeHtml(asm.type)}</div>
+               <div style="font-size:0.8rem; color:var(--text-muted);">${Utils.formatDate(asm.date)}</div>
+            </div>
+            <div style="font-size:0.85rem; color:var(--text-secondary); margin-top:4px;">Result/Score: <strong style="color:var(--primary);">${Utils.escapeHtml(asm.score)}</strong></div>
+            ${asm.remarks ? `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px; font-style:italic;">"${Utils.escapeHtml(asm.remarks)}"</div>` : ''}
+            ${asm.fileData ? `
+              <div style="margin-top:6px; display:flex; align-items:center; gap:6px;">
+                <span style="font-size:0.8rem;">📎</span>
+                <a href="${asm.fileData}" download="${Utils.escapeHtml(asm.fileName || 'report')}" class="link" style="font-size:0.8rem; text-decoration:underline;">
+                  Download ${Utils.escapeHtml(asm.fileName || 'Report')}
+                </a>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      });
+      html += `</div>`;
+    }
+    
+    html += `</div>`;
+    return html;
   }
 
   function toggleFlag(studentId) {

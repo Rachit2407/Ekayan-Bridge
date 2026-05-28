@@ -28,10 +28,10 @@ const Dashboard = (() => {
           <div class="stat-card__value">${stats.alumniCount}</div>
           <div class="stat-card__label">Alumni</div>
         </div>
-        <div class="stat-card stat-card--flagged">
-          <div class="stat-card__icon">🔔</div>
-          <div class="stat-card__value">${stats.flaggedCount}</div>
-          <div class="stat-card__label">Need Follow-up</div>
+        <div class="stat-card stat-card--flagged" onclick="App.navigate('students', 'followup')" style="cursor:pointer;">
+          <div class="stat-card__icon">⚠️</div>
+          <div class="stat-card__value">${stats.followUpCount}</div>
+          <div class="stat-card__label">Follow-Up Required</div>
         </div>
       </div>
 
@@ -91,6 +91,20 @@ const Dashboard = (() => {
     if (!panel) return;
 
     let html = '';
+
+    // Follow-up Required students
+    const followUps = students.filter(s => s.followUpRequired);
+    followUps.forEach(s => {
+      html += `
+        <div class="alert-item" onclick="App.navigate('profile', '${s.id}')" style="border-left: 3px solid var(--warning);">
+          <span class="alert-item__icon">⚠️</span>
+          <span class="alert-item__text"><strong>${Utils.escapeHtml(s.name)}</strong> — Follow-up required ${s.followUpDate ? `by ${Utils.formatDate(s.followUpDate)}` : ''}<br>
+          <span style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-top:2px;">"${Utils.escapeHtml(s.followUpNotes || 'No notes')}"${s.followUpAssignedTo ? ` (Assigned: ${Utils.escapeHtml(s.followUpAssignedTo)})` : ''}</span>
+          </span>
+        </div>
+      `;
+    });
+
     // Flagged students
     const flagged = students.filter(s => s.flagged);
     flagged.forEach(s => {
@@ -103,7 +117,7 @@ const Dashboard = (() => {
     });
 
     // Inactive students (not flagged yet)
-    stats.inactiveStudents.filter(s => !s.flagged).forEach(s => {
+    stats.inactiveStudents.filter(s => !s.flagged && !s.followUpRequired).forEach(s => {
       html += `
         <div class="alert-item" onclick="App.navigate('profile', '${s.id}')">
           <span class="alert-item__icon">⏰</span>

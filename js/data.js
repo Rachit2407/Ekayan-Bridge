@@ -60,6 +60,11 @@ const DataStore = (() => {
       isActive: true,
       flagged: false,
       flagReason: '',
+      followUpRequired: data.followUpRequired || false,
+      followUpNotes: data.followUpNotes || '',
+      followUpAssignedTo: data.followUpAssignedTo || '',
+      followUpDate: data.followUpDate || '',
+      assessments: data.assessments || [],
       lastContactDate: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -73,6 +78,39 @@ const DataStore = (() => {
     if (!student) return null;
     Object.assign(student, updates);
     return saveStudent(student);
+  }
+
+  function addAssessment(studentId, assessmentData) {
+    const student = getStudent(studentId);
+    if (!student) return null;
+    
+    if (!student.assessments) {
+      student.assessments = [];
+    }
+    
+    const newAssessment = {
+      id: 'asm_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 5),
+      type: assessmentData.type || '',
+      date: assessmentData.date || new Date().toISOString().split('T')[0],
+      score: assessmentData.score || '',
+      remarks: assessmentData.remarks || '',
+      fileName: assessmentData.fileName || '',
+      fileData: assessmentData.fileData || ''
+    };
+    
+    student.assessments.push(newAssessment);
+    
+    // Also log this as a timeline event
+    addEvent({
+      studentId: studentId,
+      type: 'assessment',
+      title: `Assessment: ${newAssessment.type}`,
+      details: `Score/Result: ${newAssessment.score}. ${newAssessment.remarks}`,
+      date: newAssessment.date
+    });
+    
+    saveStudent(student);
+    return newAssessment;
   }
 
   // ---- Timeline Events ----
@@ -127,7 +165,7 @@ const DataStore = (() => {
     let flagged = 0;
 
     students.forEach(s => {
-      if (s.programStage === 'alumni' || s.programStage === 'dropped_out' || s.programStage === 'completed') return;
+      if (s.programStage === 'sampark') return;
       
       const lastContact = new Date(s.lastContactDate || s.enrollmentDate || s.createdAt);
       if (lastContact < threshold && !s.flagged) {
@@ -181,6 +219,7 @@ const DataStore = (() => {
           
           // Merge or replace
           localStorage.setItem(STUDENTS_KEY, JSON.stringify(data.students));
+          migrateStages();
           localStorage.setItem(EVENTS_KEY, JSON.stringify(data.events || []));
           if (data.settings) {
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(data.settings));
@@ -198,16 +237,45 @@ const DataStore = (() => {
     });
   }
 
+  // ---- Migrate legacy program stages ----
+  function migrateStages() {
+    const students = getAllStudents();
+    let modified = false;
+    students.forEach(s => {
+      if (s.programStage === 'active') {
+        s.programStage = 'neev';
+        modified = true;
+      } else if (s.programStage === 'alumni') {
+        s.programStage = 'sampark';
+        modified = true;
+      } else if (s.programStage === 'on_hold') {
+        s.programStage = 'enrolled';
+        modified = true;
+      }
+      if (!['enrolled', 'neev', 'disha', 'nirmaan', 'sampark'].includes(s.programStage)) {
+        s.programStage = 'enrolled';
+        modified = true;
+      }
+    });
+    if (modified) {
+      localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
+    }
+  }
+
   // ---- Seed demo data ----
 
   function seedDemoData() {
-    if (getAllStudents().length > 0) return; // Don't overwrite existing data
+    if (getAllStudents().length > 0) {
+      // Still run migration on existing data to fix stages
+      migrateStages();
+      return;
+    }
 
     const demoStudents = [
       {
         name: 'Priya Sharma', village: 'Rampur', contact: '9876543210',
         email: 'priya.s@email.com', dateOfBirth: '2005-03-15',
-        enrollmentDate: '2025-06-01', programStage: 'active',
+        enrollmentDate: '2025-06-01', programStage: 'disha',
         careerInterests: ['Teaching', 'Social Work'],
         schoolCollegeJob: 'Class 12 — Govt. Sr. Sec. School, Rampur',
         lastContactDate: new Date(Date.now() - 2 * 86400000).toISOString()
@@ -215,7 +283,7 @@ const DataStore = (() => {
       {
         name: 'Rahul Meena', village: 'Kherli', contact: '9123456789',
         email: '', dateOfBirth: '2004-08-22',
-        enrollmentDate: '2025-01-15', programStage: 'alumni',
+        enrollmentDate: '2025-01-15', programStage: 'sampark',
         careerInterests: ['IT', 'Data Entry'],
         schoolCollegeJob: 'Data Entry Operator — Jaipur District Office',
         alumniStatus: { outcome: 'Employed', details: 'Got govt. contract job after completing program' },
@@ -232,7 +300,7 @@ const DataStore = (() => {
       {
         name: 'Amit Yadav', village: 'Laxmangarh', contact: '9012345678',
         email: '', dateOfBirth: '2003-07-19',
-        enrollmentDate: '2024-11-01', programStage: 'on_hold',
+        enrollmentDate: '2024-11-01', programStage: 'neev',
         careerInterests: ['Mechanics', 'Electrician'],
         schoolCollegeJob: 'ITI — Sikar',
         flagged: true, flagReason: 'Family financial issues, needs scholarship support',
@@ -241,7 +309,7 @@ const DataStore = (() => {
       {
         name: 'Kavita Joshi', village: 'Mandawa', contact: '9876501234',
         email: 'kavita.j@email.com', dateOfBirth: '2005-01-30',
-        enrollmentDate: '2025-03-20', programStage: 'active',
+        enrollmentDate: '2025-03-20', programStage: 'disha',
         careerInterests: ['Fashion Design', 'Tailoring'],
         schoolCollegeJob: 'Class 11 — Mandawa Girls School',
         lastContactDate: new Date(Date.now() - 5 * 86400000).toISOString()
@@ -300,6 +368,7 @@ const DataStore = (() => {
     deleteStudent,
     createStudent,
     updateStudent,
+    addAssessment,
     getAllEvents,
     getStudentEvents,
     addEvent,
@@ -309,6 +378,7 @@ const DataStore = (() => {
     exportData,
     importData,
     seedDemoData,
+    migrateStages,
     login,
     logout,
     getCurrentUser

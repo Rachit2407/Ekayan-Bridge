@@ -257,12 +257,12 @@ const Forms = (() => {
     `;
     showModal('Change Program Stage', html);
 
-    // Show alumni fields when alumni is selected
+    // Show alumni fields when sampark (alumni) is selected
     setTimeout(() => {
       const sel = document.querySelector('#change-stage-form select[name="newStage"]');
       const alumniFields = document.getElementById('alumni-fields');
       if (sel && alumniFields) {
-        const toggle = () => { alumniFields.style.display = sel.value === 'alumni' ? 'block' : 'none'; };
+        const toggle = () => { alumniFields.style.display = sel.value === 'sampark' ? 'block' : 'none'; };
         sel.addEventListener('change', toggle);
         toggle();
       }
@@ -276,14 +276,10 @@ const Forms = (() => {
     const oldStage = DataStore.getStudent(studentId).programStage;
 
     const updates = { programStage: newStage };
-    if (newStage === 'alumni' && form.alumniOutcome) {
+    if (newStage === 'sampark' && form.alumniOutcome) {
       updates.alumniStatus = { outcome: form.alumniOutcome.value.trim(), details: form.alumniDetails.value.trim() };
     }
-    if (newStage === 'dropped_out' || newStage === 'completed' || newStage === 'alumni') {
-      updates.isActive = false;
-    } else {
-      updates.isActive = true;
-    }
+    updates.isActive = (newStage !== 'sampark');
 
     DataStore.updateStudent(studentId, updates);
 
@@ -302,11 +298,157 @@ const Forms = (() => {
     App.updateFlagBadge();
   }
 
+  // ---- Add Assessment ----
+  function showAddAssessment(studentId) {
+    const html = `
+      <form id="add-assessment-form" onsubmit="Forms.handleAddAssessment(event, '${studentId}')">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Assessment Type *</label>
+            <input type="text" name="type" required placeholder="e.g. Mid-term, Math Placement, English Oral">
+          </div>
+          <div class="form-group">
+            <label>Date *</label>
+            <input type="date" name="date" required value="${new Date().toISOString().split('T')[0]}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Score / Result *</label>
+          <input type="text" name="score" required placeholder="e.g. 85/100, Grade A, Pass">
+        </div>
+        <div class="form-group">
+          <label>Remarks / Notes</label>
+          <textarea name="remarks" placeholder="Add observations, areas of improvement..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Report Attachment (PDF or Image, max 1.5MB)</label>
+          <input type="file" id="assessment-attachment" accept=".pdf,image/*">
+          <div id="file-error" style="color:var(--danger); font-size:0.8rem; margin-top:4px; display:none;">File size exceeds 1.5MB limit. Please compress/resize.</div>
+        </div>
+        <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:24px;">
+          <button type="button" class="btn" onclick="Forms.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn--primary">Save Assessment</button>
+        </div>
+      </form>
+    `;
+    showModal('Add Assessment Report', html);
+  }
+
+  function handleAddAssessment(e, studentId) {
+    e.preventDefault();
+    const form = e.target;
+    const fileInput = document.getElementById('assessment-attachment');
+    const fileError = document.getElementById('file-error');
+    
+    const assessmentData = {
+      type: form.type.value.trim(),
+      date: form.date.value,
+      score: form.score.value.trim(),
+      remarks: form.remarks.value.trim(),
+      fileName: '',
+      fileData: ''
+    };
+    
+    const processSave = () => {
+      DataStore.addAssessment(studentId, assessmentData);
+      closeModal();
+      Utils.showToast('Assessment report added successfully', 'success');
+      Profile.render(studentId);
+    };
+
+    if (fileInput && fileInput.files && fileInput.files[0]) {
+      const file = fileInput.files[0];
+      if (file.size > 1.5 * 1024 * 1024) {
+        if (fileError) fileError.style.display = 'block';
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        assessmentData.fileName = file.name;
+        assessmentData.fileData = evt.target.result; // Base64 data URL
+        processSave();
+      };
+      reader.readAsDataURL(file);
+    } else {
+      processSave();
+    }
+  }
+
+  // ---- Follow-Up Settings ----
+  function showFollowUpModal(studentId) {
+    const s = DataStore.getStudent(studentId);
+    if (!s) return;
+    
+    const html = `
+      <form id="follow-up-form" onsubmit="Forms.handleFollowUp(event, '${studentId}')">
+        <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+          <input type="checkbox" id="follow-up-required" name="followUpRequired" ${s.followUpRequired ? 'checked' : ''} style="width:20px; height:20px; cursor:pointer;">
+          <label for="follow-up-required" style="margin:0; font-weight:600; cursor:pointer;">Follow-Up Required</label>
+        </div>
+        
+        <div id="follow-up-details" style="display: ${s.followUpRequired ? 'block' : 'none'};">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Assigned Staff Member</label>
+              <input type="text" name="assignedTo" value="${Utils.escapeHtml(s.followUpAssignedTo || '')}" placeholder="e.g. Rahul, Priya">
+            </div>
+            <div class="form-group">
+              <label>Target Follow-Up Date</label>
+              <input type="date" name="followUpDate" value="${Utils.toInputDate(s.followUpDate)}">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Follow-Up Notes</label>
+            <textarea name="notes" placeholder="Reason for follow-up, expected actions...">${Utils.escapeHtml(s.followUpNotes || '')}</textarea>
+          </div>
+        </div>
+        
+        <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:24px;">
+          <button type="button" class="btn" onclick="Forms.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn--primary">Save Follow-Up Status</button>
+        </div>
+      </form>
+    `;
+    showModal('Follow-Up Settings', html);
+    
+    // Toggle details section visibility based on checkbox status
+    setTimeout(() => {
+      const chk = document.getElementById('follow-up-required');
+      const details = document.getElementById('follow-up-details');
+      if (chk && details) {
+        chk.addEventListener('change', () => {
+          details.style.display = chk.checked ? 'block' : 'none';
+        });
+      }
+    }, 50);
+  }
+
+  function handleFollowUp(e, studentId) {
+    e.preventDefault();
+    const form = e.target;
+    const required = form.followUpRequired.checked;
+    
+    const updates = {
+      followUpRequired: required,
+      followUpAssignedTo: required ? form.assignedTo.value.trim() : '',
+      followUpDate: required ? form.followUpDate.value : '',
+      followUpNotes: required ? form.notes.value.trim() : ''
+    };
+    
+    DataStore.updateStudent(studentId, updates);
+    closeModal();
+    Utils.showToast(required ? 'Follow-up status active' : 'Follow-up resolved', 'success');
+    Profile.render(studentId);
+  }
+
   return {
     showModal, closeModal,
     showAddStudent, handleAddStudent,
     showEditStudent, handleEditStudent,
     showAddEvent, handleAddEvent,
-    showChangeStage, handleChangeStage
+    showChangeStage, handleChangeStage,
+    showAddAssessment, handleAddAssessment,
+    showFollowUpModal, handleFollowUp
   };
 })();

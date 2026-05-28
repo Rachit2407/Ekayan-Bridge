@@ -4,11 +4,21 @@
 
 const StudentList = (() => {
 
-  let currentFilters = { stage: 'all', flagged: false };
+  let currentFilters = { stage: 'all', flagged: false, followUp: false };
   let currentSort = 'name';
   let currentSearch = '';
 
-  function render() {
+  function render(param) {
+    if (param === 'followup') {
+      currentFilters.followUp = true;
+      currentFilters.flagged = false;
+      currentFilters.stage = 'all';
+    } else if (param === 'flagged') {
+      currentFilters.flagged = true;
+      currentFilters.followUp = false;
+      currentFilters.stage = 'all';
+    }
+
     const content = document.getElementById('app-content');
     content.innerHTML = `
       <div class="list-controls">
@@ -28,6 +38,9 @@ const StudentList = (() => {
         </select>
         <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--text-secondary);cursor:pointer;">
           <input type="checkbox" id="filter-flagged" ${currentFilters.flagged ? 'checked' : ''}> 🚩 Flagged only
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--text-secondary);cursor:pointer;margin-right:8px;">
+          <input type="checkbox" id="filter-followup" ${currentFilters.followUp ? 'checked' : ''}> ⚠️ Follow-up only
         </label>
         <button class="btn" onclick="StudentList.exportToCSV()">📤 Export CSV</button>
         <button class="btn btn--primary" onclick="Forms.showAddStudent()">+ Add Student</button>
@@ -56,6 +69,10 @@ const StudentList = (() => {
     });
     document.getElementById('filter-flagged').addEventListener('change', (e) => {
       currentFilters.flagged = e.target.checked;
+      renderList();
+    });
+    document.getElementById('filter-followup').addEventListener('change', (e) => {
+      currentFilters.followUp = e.target.checked;
       renderList();
     });
   }
@@ -88,8 +105,11 @@ const StudentList = (() => {
       const classCount = events.filter(e => e.type === 'class').length;
 
       html += `
-        <div class="student-card ${s.flagged ? 'student-card--flagged' : ''}" onclick="App.navigate('profile', '${s.id}')">
-          ${s.flagged ? '<span class="student-card__flag">🚩</span>' : ''}
+        <div class="student-card ${s.flagged ? 'student-card--flagged' : ''} ${s.followUpRequired ? 'student-card--followup' : ''}" onclick="App.navigate('profile', '${s.id}')">
+          <div class="student-card__flags" style="position:absolute; top:14px; right:14px; display:flex; gap:6px; pointer-events:none;">
+            ${s.flagged ? '<span style="font-size:1.1rem; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3)); animation: pulse 2s infinite;">🚩</span>' : ''}
+            ${s.followUpRequired ? '<span style="font-size:1.1rem; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));">⚠️</span>' : ''}
+          </div>
           <div class="student-card__header">
             <div class="student-card__avatar">${initials}</div>
             <div>
@@ -138,6 +158,10 @@ const StudentList = (() => {
       'Last Contact Date',
       'Flagged',
       'Flag Reason',
+      'Follow-Up Required',
+      'Follow-Up Notes',
+      'Follow-Up Assigned To',
+      'Follow-Up Date',
       'School/College/Job Updates',
       'Career Interests',
       'Classes Attended'
@@ -170,6 +194,10 @@ const StudentList = (() => {
         escapeCSV(s.lastContactDate),
         escapeCSV(s.flagged ? 'Yes' : 'No'),
         escapeCSV(s.flagReason || ''),
+        escapeCSV(s.followUpRequired ? 'Yes' : 'No'),
+        escapeCSV(s.followUpNotes || ''),
+        escapeCSV(s.followUpAssignedTo || ''),
+        escapeCSV(s.followUpDate || ''),
         escapeCSV(s.schoolCollegeJob || ''),
         escapeCSV(s.careerInterests || ''),
         escapeCSV(classCount)

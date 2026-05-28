@@ -105,6 +105,8 @@ a { color: var(--accent); text-decoration: none; }
 .btn--primary:hover { box-shadow: 0 4px 20px rgba(0,210,255,0.3); }
 .btn--danger { border-color: var(--danger); color: var(--danger); }
 .btn--danger:hover { background: rgba(255,71,87,0.1); }
+.btn--warning { border-color: var(--warning); color: var(--warning); }
+.btn--warning:hover { background: rgba(255,159,67,0.1); }
 .btn--sm { padding: 6px 14px; font-size: 0.82rem; }
 .btn--ghost { border: none; background: none; }
 .btn--ghost:hover { background: var(--bg-card); }
@@ -179,7 +181,8 @@ a { color: var(--accent); text-decoration: none; }
   padding: 20px; cursor: pointer; transition: all var(--transition); position: relative;
 }
 .student-card:hover { border-color: rgba(0,210,255,0.3); transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
-.student-card--flagged { border-left: 3px solid var(--warning); }
+.student-card--flagged { border-left: 3px solid var(--danger); }
+.student-card--followup { border-left: 3px solid var(--warning); }
 .student-card__header { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
 .student-card__avatar {
   width: 48px; height: 48px; border-radius: 50%; background: var(--gradient);

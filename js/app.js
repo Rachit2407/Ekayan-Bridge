@@ -146,7 +146,7 @@ const App = (() => {
     // Render view
     switch (view) {
       case 'dashboard': Dashboard.render(); break;
-      case 'students': StudentList.render(); break;
+      case 'students': StudentList.render(param); break;
       case 'profile': Profile.render(param); break;
       default: Dashboard.render();
     }

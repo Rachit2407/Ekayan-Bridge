@@ -111,6 +111,9 @@ const Utils = (() => {
     if (filters.flagged === true) {
       result = result.filter(s => s.flagged);
     }
+    if (filters.followUp === true) {
+      result = result.filter(s => s.followUpRequired);
+    }
     if (filters.enrolledAfter) {
       result = result.filter(s => new Date(s.enrollmentDate) >= new Date(filters.enrolledAfter));
     }
@@ -142,7 +145,7 @@ const Utils = (() => {
           valB = new Date(b.updatedAt || 0).getTime();
           break;
         case 'stage':
-          const stageOrder = ['enrolled', 'active', 'on_hold', 'completed', 'alumni', 'dropped_out'];
+          const stageOrder = ['enrolled', 'neev', 'disha', 'nirmaan', 'sampark'];
           valA = stageOrder.indexOf(a.programStage);
           valB = stageOrder.indexOf(b.programStage);
           break;
@@ -163,10 +166,11 @@ const Utils = (() => {
   function calculateStats(students, events) {
     const total = students.length;
     const byStage = {};
-    const stages = ['enrolled', 'active', 'on_hold', 'completed', 'alumni', 'dropped_out'];
+    const stages = ['enrolled', 'neev', 'disha', 'nirmaan', 'sampark'];
     stages.forEach(s => byStage[s] = 0);
     
     let flaggedCount = 0;
+    let followUpCount = 0;
     let activeCount = 0;
     const now = new Date();
     const thirtyDaysAgo = new Date(now - 30 * 86400000);
@@ -177,11 +181,12 @@ const Utils = (() => {
         byStage[s.programStage]++;
       }
       if (s.flagged) flaggedCount++;
-      if (s.programStage === 'active' || s.programStage === 'enrolled') activeCount++;
+      if (s.followUpRequired) followUpCount++;
+      if (s.programStage !== 'sampark') activeCount++;
       
       // Check for inactivity
       const lastContact = new Date(s.lastContactDate || s.enrollmentDate || s.createdAt);
-      if (lastContact < thirtyDaysAgo && s.programStage !== 'alumni' && s.programStage !== 'dropped_out' && s.programStage !== 'completed') {
+      if (lastContact < thirtyDaysAgo && s.programStage !== 'sampark') {
         inactiveStudents.push(s);
       }
     });
@@ -196,10 +201,11 @@ const Utils = (() => {
       total,
       byStage,
       flaggedCount,
+      followUpCount,
       activeCount,
       inactiveStudents,
       eventsByType,
-      alumniCount: byStage.alumni || 0
+      alumniCount: byStage.sampark || 0
     };
   }
 
@@ -220,12 +226,11 @@ const Utils = (() => {
    * Stage display info
    */
   const STAGES = {
-    enrolled:    { label: 'Enrolled',    color: '#6c5ce7', icon: '📋' },
-    active:      { label: 'Active',      color: '#00cec9', icon: '🚀' },
-    on_hold:     { label: 'On Hold',     color: '#fdcb6e', icon: '⏸️' },
-    completed:   { label: 'Completed',   color: '#00b894', icon: '✅' },
-    alumni:      { label: 'Alumni',      color: '#0984e3', icon: '🎓' },
-    dropped_out: { label: 'Dropped Out', color: '#d63031', icon: '⚠️' }
+    enrolled: { label: 'Enrolled',            color: '#74b9ff', icon: '📝' },
+    neev:     { label: 'Neev (9th & 10th)',   color: '#ff9f43', icon: '📖' },
+    disha:    { label: 'Disha (Junior College)', color: '#a29bfe', icon: '🏫' },
+    nirmaan:  { label: 'Nirmaan (Undergraduates)', color: '#00d2ff', icon: '🎓' },
+    sampark:  { label: 'Sampark (Alumni)',    color: '#00e676', icon: '🤝' }
   };
 
   /**
