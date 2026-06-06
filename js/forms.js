@@ -67,20 +67,53 @@ const Forms = (() => {
             <input type="date" name="enrollmentDate" value="${new Date().toISOString().split('T')[0]}">
           </div>
         </div>
-        <div class="form-group">
-          <label>Program Stage</label>
-          <select name="programStage">
-            ${Object.entries(Utils.STAGES).map(([k, v]) => `<option value="${k}" ${k === 'enrolled' ? 'selected' : ''}>${v.icon} ${v.label}</option>`).join('')}
-          </select>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Gender</label>
+            <select name="gender">
+              <option value="prefer_not_to_say" selected>Prefer not to say</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Marital Status</label>
+            <select name="maritalStatus">
+              <option value="prefer_not_to_say" selected>Prefer not to say</option>
+              <option value="single">Single</option>
+              <option value="married">Married</option>
+              <option value="divorced">Divorced</option>
+              <option value="widowed">Widowed</option>
+            </select>
+          </div>
         </div>
-        <div class="form-group">
-          <label>School / College / Job</label>
-          <input type="text" name="schoolCollegeJob" placeholder="e.g. Class 10 — Govt. School, Rampur">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Program Stage</label>
+            <select name="programStage">
+              ${Object.entries(Utils.STAGES).map(([k, v]) => `<option value="${k}" ${k === 'enrolled' ? 'selected' : ''}>${v.icon} ${v.label}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>School / College / Job</label>
+            <input type="text" name="schoolCollegeJob" placeholder="e.g. Class 10 — Govt. School, Rampur">
+          </div>
         </div>
+
+
         <div class="form-group">
           <label>Career Interests (comma-separated)</label>
           <input type="text" name="careerInterests" placeholder="e.g. Teaching, Social Work, Nursing">
         </div>
+
+        <div class="form-group" style="display:flex; align-items:center; gap:10px; margin: 20px 0; background:rgba(0,230,118,0.05); padding:12px; border-radius:8px; border:1px solid rgba(0,230,118,0.1);">
+          <input type="checkbox" name="consentGiven" id="consent-add-chk" style="width:18px; height:18px; cursor:pointer;">
+          <label for="consent-add-chk" style="margin:0; cursor:pointer; color:var(--text-primary); font-size:0.85rem;">
+            Consent obtained from student for compliance & data processing
+          </label>
+        </div>
+
         <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:24px;">
           <button type="button" class="btn" onclick="Forms.closeModal()">Cancel</button>
           <button type="submit" class="btn btn--primary">Add Student</button>
@@ -93,6 +126,8 @@ const Forms = (() => {
   function handleAddStudent(e) {
     e.preventDefault();
     const form = e.target;
+    const consent = form.consentGiven.checked;
+    
     const data = {
       name: form.name.value.trim(),
       village: form.village.value.trim(),
@@ -102,7 +137,11 @@ const Forms = (() => {
       enrollmentDate: form.enrollmentDate.value,
       programStage: form.programStage.value,
       schoolCollegeJob: form.schoolCollegeJob.value.trim(),
-      careerInterests: form.careerInterests.value.split(',').map(s => s.trim()).filter(Boolean)
+      careerInterests: form.careerInterests.value.split(',').map(s => s.trim()).filter(Boolean),
+      gender: form.gender.value,
+      maritalStatus: form.maritalStatus.value,
+      consentGiven: consent,
+      consentDate: consent ? new Date().toISOString().split('T')[0] : ''
     };
 
     // Duplicate check
@@ -136,24 +175,75 @@ const Forms = (() => {
           <div class="form-group"><label>Date of Birth</label><input type="date" name="dateOfBirth" value="${Utils.toInputDate(s.dateOfBirth)}"></div>
           <div class="form-group"><label>Enrollment Date</label><input type="date" name="enrollmentDate" value="${Utils.toInputDate(s.enrollmentDate)}"></div>
         </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Gender</label>
+            <select name="gender">
+              <option value="prefer_not_to_say" ${s.gender === 'prefer_not_to_say' ? 'selected' : ''}>Prefer not to say</option>
+              <option value="male" ${s.gender === 'male' ? 'selected' : ''}>Male</option>
+              <option value="female" ${s.gender === 'female' ? 'selected' : ''}>Female</option>
+              <option value="other" ${s.gender === 'other' ? 'selected' : ''}>Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Marital Status</label>
+            <select name="maritalStatus">
+              <option value="prefer_not_to_say" ${s.maritalStatus === 'prefer_not_to_say' ? 'selected' : ''}>Prefer not to say</option>
+              <option value="single" ${s.maritalStatus === 'single' ? 'selected' : ''}>Single</option>
+              <option value="married" ${s.maritalStatus === 'married' ? 'selected' : ''}>Married</option>
+              <option value="divorced" ${s.maritalStatus === 'divorced' ? 'selected' : ''}>Divorced</option>
+              <option value="widowed" ${s.maritalStatus === 'widowed' ? 'selected' : ''}>Widowed</option>
+            </select>
+          </div>
+        </div>
         <div class="form-group"><label>School / College / Job</label><input type="text" name="schoolCollegeJob" value="${Utils.escapeHtml(s.schoolCollegeJob)}"></div>
+
+
         <div class="form-group"><label>Career Interests (comma-separated)</label><input type="text" name="careerInterests" value="${(s.careerInterests || []).join(', ')}"></div>
-        ${s.programStage === 'alumni' ? `
+        
+        ${s.programStage === 'sampark' ? `
         <div class="form-group"><label>Alumni Outcome</label><input type="text" name="alumniOutcome" value="${Utils.escapeHtml(s.alumniStatus?.outcome || '')}"></div>
         <div class="form-group"><label>Alumni Details</label><textarea name="alumniDetails">${Utils.escapeHtml(s.alumniStatus?.details || '')}</textarea></div>
         ` : ''}
+
+        ${s.programStage === 'dropped_out' ? `
+        <div class="form-row">
+          <div class="form-group"><label>Dropout Date</label><input type="date" name="dropoutDate" value="${Utils.toInputDate(s.dropoutDate)}"></div>
+          <div class="form-group">
+            <label>Dropout Reason</label>
+            <select name="dropoutReason">
+              <option value="financial" ${s.dropoutReason === 'financial' ? 'selected' : ''}>Financial Constraints</option>
+              <option value="academic" ${s.dropoutReason === 'academic' ? 'selected' : ''}>Academic Difficulties</option>
+              <option value="family" ${s.dropoutReason === 'family' ? 'selected' : ''}>Family Migration/Issues</option>
+              <option value="employment" ${s.dropoutReason === 'employment' ? 'selected' : ''}>Employment/Job Need</option>
+              <option value="marriage" ${s.dropoutReason === 'marriage' ? 'selected' : ''}>Marriage</option>
+              <option value="other" ${s.dropoutReason === 'other' ? 'selected' : ''}>Other Reason</option>
+            </select>
+          </div>
+        </div>
+        ` : ''}
+
+        <div class="form-group" style="display:flex; align-items:center; gap:10px; margin: 20px 0; background:rgba(0,230,118,0.05); padding:12px; border-radius:8px; border:1px solid rgba(0,230,118,0.1);">
+          <input type="checkbox" name="consentGiven" id="consent-edit-chk" ${s.consentGiven ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer;">
+          <label for="consent-edit-chk" style="margin:0; cursor:pointer; color:var(--text-primary); font-size:0.85rem;">
+            Consent obtained from student for compliance & data processing
+          </label>
+        </div>
+
         <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:24px;">
           <button type="button" class="btn" onclick="Forms.closeModal()">Cancel</button>
           <button type="submit" class="btn btn--primary">Save Changes</button>
         </div>
       </form>
     `;
-    showModal('Edit Student', html);
+    showModal('Edit Student Details', html);
   }
 
   function handleEditStudent(e, studentId) {
     e.preventDefault();
     const form = e.target;
+    const consent = form.consentGiven.checked;
+    
     const updates = {
       name: form.name.value.trim(),
       village: form.village.value.trim(),
@@ -162,16 +252,25 @@ const Forms = (() => {
       dateOfBirth: form.dateOfBirth.value,
       enrollmentDate: form.enrollmentDate.value,
       schoolCollegeJob: form.schoolCollegeJob.value.trim(),
-      careerInterests: form.careerInterests.value.split(',').map(s => s.trim()).filter(Boolean)
+      careerInterests: form.careerInterests.value.split(',').map(s => s.trim()).filter(Boolean),
+      gender: form.gender.value,
+      maritalStatus: form.maritalStatus.value,
+      consentGiven: consent,
+      consentDate: consent ? (DataStore.getStudent(studentId).consentDate || new Date().toISOString().split('T')[0]) : ''
     };
 
     if (form.alumniOutcome) {
       updates.alumniStatus = { outcome: form.alumniOutcome.value.trim(), details: form.alumniDetails.value.trim() };
     }
 
+    if (form.dropoutDate) {
+      updates.dropoutDate = form.dropoutDate.value;
+      updates.dropoutReason = form.dropoutReason.value;
+    }
+
     DataStore.updateStudent(studentId, updates);
     closeModal();
-    Utils.showToast('Student updated', 'success');
+    Utils.showToast('Student details updated', 'success');
     Profile.render(studentId);
   }
 
@@ -231,20 +330,42 @@ const Forms = (() => {
       <form id="change-stage-form" onsubmit="Forms.handleChangeStage(event, '${studentId}')">
         <div class="form-group">
           <label>Current Stage</label>
-          <div style="padding:10px;font-size:1rem;">${Utils.STAGES[s.programStage]?.icon} ${Utils.STAGES[s.programStage]?.label}</div>
+          <div style="padding:10px;font-size:1rem;">${Utils.STAGES[s.programStage]?.icon || '📋'} ${Utils.STAGES[s.programStage]?.label || s.programStage}</div>
         </div>
         <div class="form-group">
           <label>New Stage</label>
-          <select name="newStage">
+          <select name="newStage" id="change-stage-select">
             ${Object.entries(Utils.STAGES).filter(([k]) => k !== s.programStage).map(([k, v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('')}
           </select>
         </div>
-        ${`<div class="form-group" id="alumni-fields" style="display:none;">
+        
+        <div class="form-group" id="alumni-fields" style="display:none;">
           <label>Alumni Outcome</label>
-          <input type="text" name="alumniOutcome" placeholder="e.g. Employed, Higher Studies">
+          <input type="text" name="alumniOutcome" placeholder="e.g. Employed, Higher Studies" value="${Utils.escapeHtml(s.alumniStatus?.outcome || '')}">
           <label style="margin-top:10px;">Details</label>
-          <textarea name="alumniDetails" placeholder="Details about placement or next steps..."></textarea>
-        </div>`}
+          <textarea name="alumniDetails" placeholder="Details about placement or next steps...">${Utils.escapeHtml(s.alumniStatus?.details || '')}</textarea>
+        </div>
+
+        <div class="form-group" id="dropout-fields" style="display:none;">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Dropout Date *</label>
+              <input type="date" name="dropoutDate" value="${new Date().toISOString().split('T')[0]}">
+            </div>
+            <div class="form-group">
+              <label>Dropout Reason *</label>
+              <select name="dropoutReason">
+                <option value="financial">Financial Constraints</option>
+                <option value="academic">Academic Difficulties</option>
+                <option value="family">Family Migration/Issues</option>
+                <option value="employment">Employment/Job Need</option>
+                <option value="marriage">Marriage</option>
+                <option value="other">Other Reason</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <div class="form-group">
           <label>Notes (optional)</label>
           <textarea name="notes" placeholder="Reason for stage change..."></textarea>
@@ -257,12 +378,16 @@ const Forms = (() => {
     `;
     showModal('Change Program Stage', html);
 
-    // Show alumni fields when sampark (alumni) is selected
+    // Show/hide fields dynamically depending on selection
     setTimeout(() => {
-      const sel = document.querySelector('#change-stage-form select[name="newStage"]');
+      const sel = document.getElementById('change-stage-select');
       const alumniFields = document.getElementById('alumni-fields');
-      if (sel && alumniFields) {
-        const toggle = () => { alumniFields.style.display = sel.value === 'sampark' ? 'block' : 'none'; };
+      const dropoutFields = document.getElementById('dropout-fields');
+      if (sel && alumniFields && dropoutFields) {
+        const toggle = () => {
+          alumniFields.style.display = sel.value === 'sampark' ? 'block' : 'none';
+          dropoutFields.style.display = sel.value === 'dropped_out' ? 'block' : 'none';
+        };
         sel.addEventListener('change', toggle);
         toggle();
       }
@@ -278,8 +403,18 @@ const Forms = (() => {
     const updates = { programStage: newStage };
     if (newStage === 'sampark' && form.alumniOutcome) {
       updates.alumniStatus = { outcome: form.alumniOutcome.value.trim(), details: form.alumniDetails.value.trim() };
+      updates.dropoutDate = '';
+      updates.dropoutReason = '';
+    } else if (newStage === 'dropped_out' && form.dropoutDate) {
+      updates.dropoutDate = form.dropoutDate.value;
+      updates.dropoutReason = form.dropoutReason.value;
+      updates.alumniStatus = { outcome: '', details: '' };
+    } else {
+      updates.dropoutDate = '';
+      updates.dropoutReason = '';
+      updates.alumniStatus = { outcome: '', details: '' };
     }
-    updates.isActive = (newStage !== 'sampark');
+    updates.isActive = (newStage !== 'sampark' && newStage !== 'dropped_out');
 
     DataStore.updateStudent(studentId, updates);
 
@@ -288,7 +423,7 @@ const Forms = (() => {
       studentId,
       type: 'stage_change',
       title: `${Utils.STAGES[oldStage]?.label || oldStage} → ${Utils.STAGES[newStage]?.label || newStage}`,
-      details: form.notes.value.trim() || `Stage changed from ${Utils.STAGES[oldStage]?.label} to ${Utils.STAGES[newStage]?.label}`,
+      details: form.notes.value.trim() || `Stage changed from ${Utils.STAGES[oldStage]?.label || oldStage} to ${Utils.STAGES[newStage]?.label || newStage}`,
       date: new Date().toISOString()
     });
 

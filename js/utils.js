@@ -61,7 +61,7 @@ const Utils = (() => {
     const diffWeeks = Math.floor(diffDays / 7);
     const diffMonths = Math.floor(diffDays / 30);
     const diffYears = Math.floor(diffDays / 365);
-
+ 
     if (diffMins < 1) return 'just now';
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
@@ -82,6 +82,46 @@ const Utils = (() => {
   }
 
   /**
+   * Calculate Age from DOB
+   */
+  function calculateAge(dobStr) {
+    if (!dobStr) return '—';
+    const dob = new Date(dobStr);
+    if (isNaN(dob.getTime())) return '—';
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+    return age;
+  }
+
+  /**
+   * PII Masking Utilities
+   */
+  function maskContact(contact) {
+    if (!contact) return '—';
+    const clean = contact.replace(/\s+/g, '');
+    if (clean.length < 4) return '******';
+    return '******' + clean.slice(-4);
+  }
+
+  function maskEmail(email) {
+    if (!email) return '—';
+    const idx = email.indexOf('@');
+    if (idx <= 1) return '******@email.com';
+    return email.charAt(0) + '****' + email.substring(idx);
+  }
+
+  function maskDateOfBirth(dob) {
+    if (!dob) return '—';
+    const parts = dob.split('-');
+    if (parts.length !== 3) return '****-**-**';
+    return `****-**-${parts[2]}`; // Keep only day for cohort identification, mask year/month
+  }
+
+  /**
    * Search students by query across multiple fields
    */
   function searchStudents(students, query) {
@@ -94,7 +134,9 @@ const Utils = (() => {
         (s.village && s.village.toLowerCase().includes(q)) ||
         (s.contact && s.contact.includes(q)) ||
         (s.email && s.email.toLowerCase().includes(q)) ||
-        (s.schoolCollegeJob && s.schoolCollegeJob.toLowerCase().includes(q))
+        (s.schoolCollegeJob && s.schoolCollegeJob.toLowerCase().includes(q)) ||
+        (s.gender && s.gender.toLowerCase() === q) ||
+        (s.maritalStatus && s.maritalStatus.toLowerCase() === q)
       );
     });
   }
@@ -113,6 +155,12 @@ const Utils = (() => {
     }
     if (filters.followUp === true) {
       result = result.filter(s => s.followUpRequired);
+    }
+    if (filters.gender && filters.gender !== 'all') {
+      result = result.filter(s => s.gender === filters.gender);
+    }
+    if (filters.maritalStatus && filters.maritalStatus !== 'all') {
+      result = result.filter(s => s.maritalStatus === filters.maritalStatus);
     }
     if (filters.enrolledAfter) {
       result = result.filter(s => new Date(s.enrollmentDate) >= new Date(filters.enrolledAfter));
@@ -145,7 +193,7 @@ const Utils = (() => {
           valB = new Date(b.updatedAt || 0).getTime();
           break;
         case 'stage':
-          const stageOrder = ['enrolled', 'neev', 'disha', 'nirmaan', 'sampark'];
+          const stageOrder = ['enrolled', 'neev', 'disha', 'nirmaan', 'sampark', 'dropped_out'];
           valA = stageOrder.indexOf(a.programStage);
           valB = stageOrder.indexOf(b.programStage);
           break;
@@ -166,7 +214,7 @@ const Utils = (() => {
   function calculateStats(students, events) {
     const total = students.length;
     const byStage = {};
-    const stages = ['enrolled', 'neev', 'disha', 'nirmaan', 'sampark'];
+    const stages = ['enrolled', 'neev', 'disha', 'nirmaan', 'sampark', 'dropped_out'];
     stages.forEach(s => byStage[s] = 0);
     
     let flaggedCount = 0;
@@ -182,11 +230,13 @@ const Utils = (() => {
       }
       if (s.flagged) flaggedCount++;
       if (s.followUpRequired) followUpCount++;
-      if (s.programStage !== 'sampark') activeCount++;
+      
+      // Active count excludes Alumni (sampark) and Dropped Out
+      if (s.programStage !== 'sampark' && s.programStage !== 'dropped_out') activeCount++;
       
       // Check for inactivity
       const lastContact = new Date(s.lastContactDate || s.enrollmentDate || s.createdAt);
-      if (lastContact < thirtyDaysAgo && s.programStage !== 'sampark') {
+      if (lastContact < thirtyDaysAgo && s.programStage !== 'sampark' && s.programStage !== 'dropped_out') {
         inactiveStudents.push(s);
       }
     });
@@ -226,11 +276,12 @@ const Utils = (() => {
    * Stage display info
    */
   const STAGES = {
-    enrolled: { label: 'Enrolled',            color: '#74b9ff', icon: '📝' },
-    neev:     { label: 'Neev (9th & 10th)',   color: '#ff9f43', icon: '📖' },
-    disha:    { label: 'Disha (Junior College)', color: '#a29bfe', icon: '🏫' },
-    nirmaan:  { label: 'Nirmaan (Undergraduates)', color: '#00d2ff', icon: '🎓' },
-    sampark:  { label: 'Sampark (Alumni)',    color: '#00e676', icon: '🤝' }
+    enrolled:    { label: 'Enrolled',            color: '#74b9ff', icon: '📝' },
+    neev:        { label: 'Neev (9th & 10th)',   color: '#ff9f43', icon: '📖' },
+    disha:       { label: 'Disha (Junior College)', color: '#a29bfe', icon: '🏫' },
+    nirmaan:     { label: 'Nirmaan (Undergraduates)', color: '#00d2ff', icon: '🎓' },
+    sampark:     { label: 'Sampark (Alumni)',    color: '#00e676', icon: '🤝' },
+    dropped_out: { label: 'Dropped Out',         color: '#ff4757', icon: '⚠️' }
   };
 
   /**
@@ -299,7 +350,7 @@ const Utils = (() => {
       overlay = document.createElement('div');
       overlay.id = 'dialog-overlay';
       overlay.className = 'modal-overlay';
-      overlay.style.zIndex = '10000'; // Sits above login-overlay (z-index 9999)
+      overlay.style.zIndex = '10000';
       document.body.appendChild(overlay);
     }
     overlay.innerHTML = `
@@ -319,6 +370,10 @@ const Utils = (() => {
     formatDate,
     timeAgo,
     toInputDate,
+    calculateAge,
+    maskContact,
+    maskEmail,
+    maskDateOfBirth,
     searchStudents,
     filterStudents,
     sortStudents,

@@ -4,7 +4,13 @@
 
 const StudentList = (() => {
 
-  let currentFilters = { stage: 'all', flagged: false, followUp: false };
+  let currentFilters = { 
+    stage: 'all', 
+    flagged: false, 
+    followUp: false,
+    gender: 'all',
+    maritalStatus: 'all'
+  };
   let currentSort = 'name';
   let currentSearch = '';
 
@@ -21,31 +27,54 @@ const StudentList = (() => {
 
     const content = document.getElementById('app-content');
     content.innerHTML = `
-      <div class="list-controls">
-        <div class="search-box">
+      <!-- Filters and Actions Toolbar -->
+      <div class="list-controls" style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+        <div class="search-box" style="flex: 1 1 200px;">
           <span class="search-box__icon">🔍</span>
-          <input type="text" id="student-search" class="search-box__input" placeholder="Search by name, ID, village..." value="${Utils.escapeHtml(currentSearch)}">
+          <input type="text" id="student-search" class="search-box__input" placeholder="Search name, ID, village..." value="${Utils.escapeHtml(currentSearch)}">
         </div>
         <select id="filter-stage" class="filter-select">
           <option value="all">All Stages</option>
           ${Object.entries(Utils.STAGES).map(([k, v]) => `<option value="${k}" ${currentFilters.stage === k ? 'selected' : ''}>${v.icon} ${v.label}</option>`).join('')}
         </select>
+        <select id="filter-gender" class="filter-select">
+          <option value="all" ${currentFilters.gender === 'all' ? 'selected' : ''}>All Genders</option>
+          <option value="male" ${currentFilters.gender === 'male' ? 'selected' : ''}>Male</option>
+          <option value="female" ${currentFilters.gender === 'female' ? 'selected' : ''}>Female</option>
+          <option value="other" ${currentFilters.gender === 'other' ? 'selected' : ''}>Other</option>
+          <option value="prefer_not_to_say" ${currentFilters.gender === 'prefer_not_to_say' ? 'selected' : ''}>N/A</option>
+        </select>
+        <select id="filter-marital" class="filter-select">
+          <option value="all" ${currentFilters.maritalStatus === 'all' ? 'selected' : ''}>All Marital Statuses</option>
+          <option value="single" ${currentFilters.maritalStatus === 'single' ? 'selected' : ''}>Single</option>
+          <option value="married" ${currentFilters.maritalStatus === 'married' ? 'selected' : ''}>Married</option>
+          <option value="divorced" ${currentFilters.maritalStatus === 'divorced' ? 'selected' : ''}>Divorced</option>
+          <option value="widowed" ${currentFilters.maritalStatus === 'widowed' ? 'selected' : ''}>Widowed</option>
+          <option value="prefer_not_to_say" ${currentFilters.maritalStatus === 'prefer_not_to_say' ? 'selected' : ''}>N/A</option>
+        </select>
+
         <select id="sort-by" class="filter-select">
           <option value="name" ${currentSort === 'name' ? 'selected' : ''}>Sort: Name</option>
           <option value="enrollmentDate" ${currentSort === 'enrollmentDate' ? 'selected' : ''}>Sort: Enrollment</option>
           <option value="lastActivity" ${currentSort === 'lastActivity' ? 'selected' : ''}>Sort: Last Activity</option>
           <option value="stage" ${currentSort === 'stage' ? 'selected' : ''}>Sort: Stage</option>
         </select>
-        <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--text-secondary);cursor:pointer;">
-          <input type="checkbox" id="filter-flagged" ${currentFilters.flagged ? 'checked' : ''}> 🚩 Flagged only
-        </label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--text-secondary);cursor:pointer;margin-right:8px;">
-          <input type="checkbox" id="filter-followup" ${currentFilters.followUp ? 'checked' : ''}> ⚠️ Follow-up only
-        </label>
-        <button class="btn" onclick="StudentList.exportToCSV()">📤 Export CSV</button>
-        <button class="btn btn--primary" onclick="Forms.showAddStudent()">+ Add Student</button>
+        
+        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--text-secondary);cursor:pointer;">
+            <input type="checkbox" id="filter-flagged" ${currentFilters.flagged ? 'checked' : ''}> 🚩 Flagged
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--text-secondary);cursor:pointer;">
+            <input type="checkbox" id="filter-followup" ${currentFilters.followUp ? 'checked' : ''}> ⚠️ Follow-up
+          </label>
+        </div>
+        
+        <div style="display:flex; gap:8px; margin-left:auto;">
+          <button class="btn" onclick="StudentList.exportToCSV()">📤 Export CSV</button>
+          <button class="btn btn--primary" onclick="Forms.showAddStudent()">+ Add Student</button>
+        </div>
       </div>
-      <div id="student-list-area"></div>
+      <div id="student-list-area" style="margin-top:20px;"></div>
     `;
 
     bindControls();
@@ -63,6 +92,15 @@ const StudentList = (() => {
       currentFilters.stage = e.target.value;
       renderList();
     });
+    document.getElementById('filter-gender').addEventListener('change', (e) => {
+      currentFilters.gender = e.target.value;
+      renderList();
+    });
+    document.getElementById('filter-marital').addEventListener('change', (e) => {
+      currentFilters.maritalStatus = e.target.value;
+      renderList();
+    });
+
     document.getElementById('sort-by').addEventListener('change', (e) => {
       currentSort = e.target.value;
       renderList();
@@ -89,7 +127,7 @@ const StudentList = (() => {
       area.innerHTML = `
         <div class="empty-state">
           <div class="empty-state__icon">📋</div>
-          <div class="empty-state__text">${currentSearch || currentFilters.stage !== 'all' ? 'No students match your filters.' : 'No students yet. Add your first student!'}</div>
+          <div class="empty-state__text">${currentSearch || currentFilters.stage !== 'all' || currentFilters.gender !== 'all' || currentFilters.maritalStatus !== 'all' ? 'No students match your filters.' : 'No students yet. Add your first student!'}</div>
           ${!currentSearch ? '<button class="btn btn--primary" onclick="Forms.showAddStudent()">+ Add Student</button>' : ''}
         </div>
       `;
@@ -104,10 +142,15 @@ const StudentList = (() => {
       const events = DataStore.getStudentEvents(s.id);
       const classCount = events.filter(e => e.type === 'class').length;
 
+      // PII masking for display in cards for staff users
+      const currentUser = DataStore.getCurrentUser();
+      const isStaff = currentUser && currentUser.role === 'staff';
+      const displayContact = isStaff ? Utils.maskContact(s.contact) : s.contact;
+
       html += `
         <div class="student-card ${s.flagged ? 'student-card--flagged' : ''} ${s.followUpRequired ? 'student-card--followup' : ''}" onclick="App.navigate('profile', '${s.id}')">
           <div class="student-card__flags" style="position:absolute; top:14px; right:14px; display:flex; gap:6px; pointer-events:none;">
-            ${s.flagged ? '<span style="font-size:1.1rem; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3)); animation: pulse 2s infinite;">🚩</span>' : ''}
+            ${s.flagged ? '<span style="font-size:1.1rem; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));">🚩</span>' : ''}
             ${s.followUpRequired ? '<span style="font-size:1.1rem; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));">⚠️</span>' : ''}
           </div>
           <div class="student-card__header">
@@ -119,12 +162,14 @@ const StudentList = (() => {
           </div>
           <div class="student-card__details">
             <div class="student-card__detail">📍 ${Utils.escapeHtml(s.village || '—')}</div>
+            <div class="student-card__detail">📞 ${Utils.escapeHtml(displayContact || '—')}</div>
             <div class="student-card__detail">📅 Enrolled ${Utils.formatDate(s.enrollmentDate)}</div>
             <div class="student-card__detail">📚 ${classCount} classes attended</div>
-            <div style="margin-top:6px;">
+            <div style="margin-top:10px; display:flex; gap:6px; align-items:center;">
               <span class="stage-badge" style="background:${stageInfo.color}22; color:${stageInfo.color}; border:1px solid ${stageInfo.color}44;">
                 ${stageInfo.icon} ${stageInfo.label}
               </span>
+              ${s.consentGiven ? '<span style="font-size:1.1rem;" title="Privacy Consent Granted">🛡️</span>' : '<span style="font-size:1.1rem;" title="No Signed Privacy Consent">⚠️</span>'}
             </div>
           </div>
         </div>
@@ -153,9 +198,15 @@ const StudentList = (() => {
       'Contact',
       'Email',
       'Date of Birth',
+      'Gender',
+      'Marital Status',
       'Enrollment Date',
       'Program Stage',
       'Last Contact Date',
+      'Dropout Date',
+      'Dropout Reason',
+      'Consent Given',
+      'Consent Date',
       'Flagged',
       'Flag Reason',
       'Follow-Up Required',
@@ -189,9 +240,15 @@ const StudentList = (() => {
         escapeCSV(s.contact),
         escapeCSV(s.email),
         escapeCSV(s.dateOfBirth),
+        escapeCSV(s.gender || 'prefer_not_to_say'),
+        escapeCSV(s.maritalStatus || 'prefer_not_to_say'),
         escapeCSV(s.enrollmentDate),
         escapeCSV(s.programStage),
         escapeCSV(s.lastContactDate),
+        escapeCSV(s.dropoutDate || ''),
+        escapeCSV(s.dropoutReason || ''),
+        escapeCSV(s.consentGiven ? 'Yes' : 'No'),
+        escapeCSV(s.consentDate || ''),
         escapeCSV(s.flagged ? 'Yes' : 'No'),
         escapeCSV(s.flagReason || ''),
         escapeCSV(s.followUpRequired ? 'Yes' : 'No'),
@@ -219,6 +276,7 @@ const StudentList = (() => {
     link.click();
     document.body.removeChild(link);
     
+    DataStore.addAuditLog('EXPORT_DATA', `Exported ${students.length} filtered student records to CSV`);
     Utils.showToast('CSV export downloaded successfully!', 'success');
   }
 

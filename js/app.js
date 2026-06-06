@@ -30,6 +30,9 @@ const App = (() => {
     document.getElementById('login-overlay').style.display = 'flex';
     document.querySelector('.app').style.display = 'none';
 
+    // Default to staff portal on launch
+    setLoginPortal('staff');
+
     const emailInput = document.getElementById('login-email');
     const passwordInput = document.getElementById('login-password');
     const errorEl = document.getElementById('login-error');
@@ -45,6 +48,47 @@ const App = (() => {
     document.querySelector('.app').style.display = 'flex';
   }
 
+  function setLoginPortal(portalType) {
+    const card = document.getElementById('login-card-container');
+    const hiddenPortalInput = document.getElementById('login-portal-type');
+    const btnStaff = document.getElementById('btn-staff-portal');
+    const btnAdmin = document.getElementById('btn-admin-console');
+    const emailLabel = document.getElementById('login-email-label');
+    const submitBtn = document.getElementById('login-submit-btn');
+    
+    const helpStaff = document.getElementById('help-credentials-staff');
+    const helpAdmin = document.getElementById('help-credentials-admin');
+    
+    if (!card || !hiddenPortalInput) return;
+    
+    hiddenPortalInput.value = portalType;
+    
+    if (portalType === 'admin') {
+      card.classList.add('login-card--admin');
+      btnAdmin.classList.add('login-tab--active');
+      btnStaff.classList.remove('login-tab--active');
+      emailLabel.textContent = 'Administrator Email Address';
+      submitBtn.textContent = 'Sign In to Admin Console';
+      submitBtn.style.background = 'linear-gradient(135deg, #ff4757, #ff6b81)';
+      helpStaff.style.display = 'none';
+      helpAdmin.style.display = 'block';
+    } else {
+      card.classList.remove('login-card--admin');
+      btnStaff.classList.add('login-tab--active');
+      btnAdmin.classList.remove('login-tab--active');
+      emailLabel.textContent = 'Staff Email Address';
+      submitBtn.textContent = 'Sign In to Staff Portal';
+      submitBtn.style.background = 'var(--gradient)';
+      helpStaff.style.display = 'block';
+      helpAdmin.style.display = 'none';
+    }
+    
+    // Clear inputs and hide error
+    document.getElementById('login-email').value = '';
+    document.getElementById('login-password').value = '';
+    document.getElementById('login-error').style.display = 'none';
+  }
+
   function applyRolePermissions(user) {
     const emailEl = document.getElementById('user-email');
     const roleEl = document.getElementById('user-role');
@@ -54,24 +98,31 @@ const App = (() => {
       roleEl.className = `badge badge--${user.role}`;
     }
 
-    // Role-based visibility for sidebar import/export buttons
-    const isStaff = user.role === 'staff';
+    const isAdmin = user.role === 'admin';
+
+    // Role-based visibility for sidebar import/export and logs
     const navExport = document.getElementById('nav-export');
     const navImport = document.getElementById('nav-import');
-    if (navExport) navExport.style.display = isStaff ? 'none' : 'flex';
-    if (navImport) navImport.style.display = isStaff ? 'none' : 'flex';
+    const navReports = document.getElementById('nav-reports');
+    const navAudit = document.getElementById('nav-audit');
+    
+    if (navExport) navExport.style.display = isAdmin ? 'flex' : 'none';
+    if (navImport) navImport.style.display = isAdmin ? 'flex' : 'none';
+    if (navReports) navReports.style.display = isAdmin ? 'flex' : 'none';
+    if (navAudit) navAudit.style.display = isAdmin ? 'flex' : 'none';
   }
 
   function handleLogin(e) {
     e.preventDefault();
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
+    const portalType = document.getElementById('login-portal-type').value;
     const errorEl = document.getElementById('login-error');
 
     if (errorEl) errorEl.style.display = 'none';
 
     try {
-      const session = DataStore.login(email, password);
+      const session = DataStore.login(email, password, portalType);
       Utils.showToast(`Welcome back, ${session.name}!`, 'success');
 
       document.getElementById('login-email').value = '';
@@ -88,7 +139,10 @@ const App = (() => {
       renderShell();
       navigate('dashboard');
     } catch (err) {
-      Utils.showErrorDialog('Login Failed', err.message || 'Incorrect email or password. Please try again.');
+      if (errorEl) {
+        errorEl.textContent = err.message || 'Incorrect email or password. Please try again.';
+        errorEl.style.display = 'block';
+      }
     }
   }
 
@@ -123,6 +177,14 @@ const App = (() => {
   }
 
   function navigate(view, param = null) {
+    // Enforce view authorization: staff cannot navigate directly to reports or audit
+    const currentUser = DataStore.getCurrentUser();
+    if (currentUser && currentUser.role === 'staff' && (view === 'reports' || view === 'audit')) {
+      Utils.showToast('Access denied: Admins only.', 'error');
+      navigate('dashboard');
+      return;
+    }
+
     currentView = view;
     currentParam = param;
 
@@ -135,7 +197,9 @@ const App = (() => {
     const titles = {
       dashboard: '📊 Dashboard',
       students: '👥 Students',
-      profile: '👤 Student Profile'
+      profile: '👤 Student Profile',
+      reports: '📈 Reports & Export Dashboard',
+      audit: '📜 System Audit Logs'
     };
     const topbarTitle = document.getElementById('topbar-title');
     if (topbarTitle) topbarTitle.textContent = titles[view] || 'Ekayan Bridge';
@@ -148,6 +212,8 @@ const App = (() => {
       case 'dashboard': Dashboard.render(); break;
       case 'students': StudentList.render(param); break;
       case 'profile': Profile.render(param); break;
+      case 'reports': Reports.render(); break;
+      case 'audit': AuditLogs.render(); break;
       default: Dashboard.render();
     }
 
@@ -163,7 +229,7 @@ const App = (() => {
     badge.style.display = flagged > 0 ? 'inline' : 'none';
   }
 
-  return { init, navigate, updateFlagBadge, handleLogin, handleLogout };
+  return { init, navigate, updateFlagBadge, handleLogin, handleLogout, setLoginPortal };
 })();
 
 // Start the app

@@ -7,6 +7,32 @@ const DataStore = (() => {
   const STUDENTS_KEY = 'cf_students';
   const EVENTS_KEY = 'cf_events';
   const SETTINGS_KEY = 'cf_settings';
+  const AUDIT_KEY = 'eb_audit_logs';
+
+  // ---- Audit Logs ----
+
+  function getAllAuditLogs() {
+    return JSON.parse(localStorage.getItem(AUDIT_KEY) || '[]');
+  }
+
+  function addAuditLog(action, details) {
+    const logs = getAllAuditLogs();
+    const currentUser = getCurrentUser();
+    const log = {
+      id: 'log_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 5),
+      timestamp: new Date().toISOString(),
+      user: currentUser ? currentUser.email : 'system',
+      role: currentUser ? currentUser.role : 'system',
+      action: action,
+      details: details
+    };
+    logs.push(log);
+    localStorage.setItem(AUDIT_KEY, JSON.stringify(logs));
+    
+    // Background sync to Supabase if config is active
+    syncAuditLogToSupabase(log);
+    return log;
+  }
 
   // ---- Students ----
 
@@ -24,23 +50,45 @@ const DataStore = (() => {
     
     student.updatedAt = new Date().toISOString();
     
+    let isNew = true;
     if (index >= 0) {
       students[index] = student;
+      isNew = false;
     } else {
       student.createdAt = student.createdAt || new Date().toISOString();
       students.push(student);
     }
     
     localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
+    
+    // Log audit event (avoid logging during initial seed to prevent spam)
+    if (getCurrentUser()) {
+      addAuditLog(
+        isNew ? 'CREATE_STUDENT' : 'UPDATE_STUDENT', 
+        `${isNew ? 'Created' : 'Updated'} student: ${student.name} (${student.id})`
+      );
+    }
+    
+    // Background sync to Supabase
+    syncStudentToSupabase(student);
+    
     return student;
   }
 
   function deleteStudent(id) {
+    const student = getStudent(id);
+    const studentName = student ? student.name : 'Unknown';
+    
     const students = getAllStudents().filter(s => s.id !== id);
     localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
     // Also delete associated events
     const events = getAllEvents().filter(e => e.studentId !== id);
     localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
+    
+    addAuditLog('DELETE_STUDENT', `Deleted student: ${studentName} (${id})`);
+    
+    // Background sync to Supabase
+    syncDeleteStudentFromSupabase(id);
   }
 
   function createStudent(data) {
@@ -57,7 +105,7 @@ const DataStore = (() => {
       careerInterests: data.careerInterests || [],
       schoolCollegeJob: data.schoolCollegeJob || '',
       alumniStatus: data.alumniStatus || { outcome: '', details: '' },
-      isActive: true,
+      isActive: data.programStage !== 'dropped_out' && data.programStage !== 'sampark',
       flagged: false,
       flagReason: '',
       followUpRequired: data.followUpRequired || false,
@@ -67,7 +115,16 @@ const DataStore = (() => {
       assessments: data.assessments || [],
       lastContactDate: new Date().toISOString(),
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      
+      // New enhanced fields
+      gender: data.gender || 'prefer_not_to_say',
+      maritalStatus: data.maritalStatus || 'prefer_not_to_say',
+
+      dropoutDate: data.dropoutDate || '',
+      dropoutReason: data.dropoutReason || '',
+      consentGiven: data.consentGiven === undefined ? false : data.consentGiven,
+      consentDate: data.consentDate || ''
     };
     
     return saveStudent(student);
@@ -110,6 +167,8 @@ const DataStore = (() => {
     });
     
     saveStudent(student);
+    addAuditLog('ADD_ASSESSMENT', `Added assessment (${newAssessment.type}) to student ID: ${studentId}`);
+    
     return newAssessment;
   }
 
@@ -142,12 +201,24 @@ const DataStore = (() => {
     // Update student's lastContactDate
     updateStudent(data.studentId, { lastContactDate: new Date().toISOString() });
     
+    if (getCurrentUser()) {
+      addAuditLog('ADD_EVENT', `Added timeline event: "${event.title}" for student ID: ${data.studentId}`);
+    }
+    
+    // Background sync to Supabase
+    syncEventToSupabase(event);
+    
     return event;
   }
 
   function deleteEvent(eventId) {
     const events = getAllEvents().filter(e => e.eventId !== eventId);
     localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
+    
+    addAuditLog('DELETE_EVENT', `Deleted event ID: ${eventId}`);
+    
+    // Background sync to Supabase
+    syncDeleteEventFromSupabase(eventId);
   }
 
   function getRecentEvents(limit = 10) {
@@ -165,7 +236,7 @@ const DataStore = (() => {
     let flagged = 0;
 
     students.forEach(s => {
-      if (s.programStage === 'sampark') return;
+      if (s.programStage === 'sampark' || s.programStage === 'dropped_out') return;
       
       const lastContact = new Date(s.lastContactDate || s.enrollmentDate || s.createdAt);
       if (lastContact < threshold && !s.flagged) {
@@ -178,6 +249,11 @@ const DataStore = (() => {
 
     if (flagged > 0) {
       localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
+      // Sync modified students back to Supabase
+      students.forEach(s => {
+        if (s.flagged) syncStudentToSupabase(s);
+      });
+      addAuditLog('AUTO_FLAG_INACTIVE', `Auto-flagged ${flagged} inactive students`);
     }
     return flagged;
   }
@@ -186,7 +262,7 @@ const DataStore = (() => {
 
   function exportData() {
     const data = {
-      version: '1.0',
+      version: '1.1',
       exportDate: new Date().toISOString(),
       students: getAllStudents(),
       events: getAllEvents(),
@@ -203,6 +279,7 @@ const DataStore = (() => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
+    addAuditLog('EXPORT_DATA', 'Exported JSON backup file');
     Utils.showToast('Data exported successfully!', 'success');
   }
 
@@ -225,6 +302,14 @@ const DataStore = (() => {
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(data.settings));
           }
           
+          addAuditLog('IMPORT_DATA', `Imported database containing ${data.students.length} students`);
+          
+          // Sync all imported data to Supabase
+          if (typeof supabase !== 'undefined' && supabase) {
+            data.students.forEach(s => syncStudentToSupabase(s));
+            (data.events || []).forEach(evt => syncEventToSupabase(evt));
+          }
+          
           Utils.showToast(`Imported ${data.students.length} students successfully!`, 'success');
           resolve(data);
         } catch (err) {
@@ -235,6 +320,160 @@ const DataStore = (() => {
       reader.onerror = () => reject(new Error('Failed to read file'));
       reader.readAsText(file);
     });
+  }
+
+  // ---- Supabase Sync Helpers ----
+
+  async function syncAuditLogToSupabase(log) {
+    if (typeof supabase === 'undefined' || !supabase) return;
+    try {
+      const { error } = await supabase.from('audit_logs').insert([log]);
+      if (error) console.error('Error syncing audit log to Supabase:', error);
+    } catch (err) {
+      console.warn('Supabase audit log sync warning:', err);
+    }
+  }
+
+  async function syncStudentToSupabase(student) {
+    if (typeof supabase === 'undefined' || !supabase) return;
+    try {
+      const dbStudent = {
+        id: student.id,
+        name: student.name,
+        village: student.village,
+        contact: student.contact,
+        email: student.email,
+        date_of_birth: student.dateOfBirth || null,
+        enrollment_date: student.enrollmentDate,
+        program_stage: student.programStage,
+        school_college_job: student.schoolCollegeJob,
+        career_interests: student.careerInterests || [],
+        flagged: student.flagged,
+        flag_reason: student.flagReason,
+        follow_up_required: student.followUpRequired,
+        follow_up_notes: student.followUpNotes,
+        follow_up_assigned_to: student.followUpAssignedTo,
+        follow_up_date: student.followUpDate || null,
+        assessments: student.assessments || [],
+        // New columns
+        gender: student.gender || 'prefer_not_to_say',
+        marital_status: student.maritalStatus || 'prefer_not_to_say',
+
+        dropout_date: student.dropoutDate || null,
+        dropout_reason: student.dropoutReason || '',
+        consent_given: student.consentGiven || false,
+        consent_date: student.consentDate || null
+      };
+      const { error } = await supabase.from('students').upsert(dbStudent);
+      if (error) console.error('Error syncing student to Supabase:', error);
+    } catch (err) {
+      console.warn('Supabase sync warning:', err);
+    }
+  }
+
+  async function syncDeleteStudentFromSupabase(id) {
+    if (typeof supabase === 'undefined' || !supabase) return;
+    try {
+      const { error } = await supabase.from('students').delete().eq('id', id);
+      if (error) console.error('Error deleting student from Supabase:', error);
+    } catch (err) {
+      console.warn('Supabase delete warning:', err);
+    }
+  }
+
+  async function syncEventToSupabase(event) {
+    if (typeof supabase === 'undefined' || !supabase) return;
+    try {
+      const dbEvent = {
+        id: event.eventId,
+        student_id: event.studentId,
+        type: event.type,
+        title: event.title,
+        details: event.details,
+        date: event.date,
+        created_at: event.createdAt
+      };
+      const { error } = await supabase.from('events').upsert(dbEvent);
+      if (error) console.error('Error syncing event to Supabase:', error);
+    } catch (err) {
+      console.warn('Supabase event sync warning:', err);
+    }
+  }
+
+  async function syncDeleteEventFromSupabase(eventId) {
+    if (typeof supabase === 'undefined' || !supabase) return;
+    try {
+      const { error } = await supabase.from('events').delete().eq('id', eventId);
+      if (error) console.error('Error deleting event from Supabase:', error);
+    } catch (err) {
+      console.warn('Supabase event delete warning:', err);
+    }
+  }
+
+  async function pullFromSupabase() {
+    if (typeof supabase === 'undefined' || !supabase) return;
+    try {
+      // 1. Fetch Students
+      const { data: dbStudents, error: sErr } = await supabase.from('students').select('*');
+      if (!sErr && dbStudents) {
+        const localStudents = dbStudents.map(s => ({
+          id: s.id,
+          name: s.name,
+          village: s.village,
+          contact: s.contact,
+          email: s.email,
+          dateOfBirth: s.date_of_birth,
+          enrollmentDate: s.enrollment_date,
+          programStage: s.program_stage,
+          schoolCollegeJob: s.school_college_job,
+          careerInterests: s.career_interests,
+          flagged: s.flagged,
+          flagReason: s.flag_reason,
+          followUpRequired: s.follow_up_required,
+          followUpNotes: s.follow_up_notes,
+          followUpAssignedTo: s.follow_up_assigned_to,
+          followUpDate: s.follow_up_date,
+          assessments: s.assessments || [],
+          createdAt: s.created_at,
+          updatedAt: s.updated_at,
+          // New Columns Scoped
+          gender: s.gender || 'prefer_not_to_say',
+          maritalStatus: s.marital_status || 'prefer_not_to_say',
+
+          dropoutDate: s.dropout_date || '',
+          dropoutReason: s.dropout_reason || '',
+          consentGiven: s.consent_given || false,
+          consentDate: s.consent_date || ''
+        }));
+        localStorage.setItem(STUDENTS_KEY, JSON.stringify(localStudents));
+      }
+
+      // 2. Fetch Events
+      const { data: dbEvents, error: eErr } = await supabase.from('events').select('*');
+      if (!eErr && dbEvents) {
+        const localEvents = dbEvents.map(e => ({
+          eventId: e.id,
+          studentId: e.student_id,
+          type: e.type,
+          title: e.title,
+          details: e.details,
+          date: e.date,
+          createdAt: e.created_at
+        }));
+        localStorage.setItem(EVENTS_KEY, JSON.stringify(localEvents));
+      }
+
+      // Refresh currently active page UI
+      if (typeof App !== 'undefined' && App.navigate && document.getElementById('app-content')) {
+        const activeNav = document.querySelector('.sidebar__nav .nav-item--active');
+        if (activeNav) {
+          const currentView = activeNav.dataset.view || 'dashboard';
+          App.navigate(currentView);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not sync from Supabase, using local storage cache:', err);
+    }
   }
 
   // ---- Migrate legacy program stages ----
@@ -252,7 +491,7 @@ const DataStore = (() => {
         s.programStage = 'enrolled';
         modified = true;
       }
-      if (!['enrolled', 'neev', 'disha', 'nirmaan', 'sampark'].includes(s.programStage)) {
+      if (!['enrolled', 'neev', 'disha', 'nirmaan', 'sampark', 'dropped_out'].includes(s.programStage)) {
         s.programStage = 'enrolled';
         modified = true;
       }
@@ -265,6 +504,9 @@ const DataStore = (() => {
   // ---- Seed demo data ----
 
   function seedDemoData() {
+    // Trigger background sync from Supabase on startup
+    pullFromSupabase();
+
     if (getAllStudents().length > 0) {
       // Still run migration on existing data to fix stages
       migrateStages();
@@ -278,7 +520,9 @@ const DataStore = (() => {
         enrollmentDate: '2025-06-01', programStage: 'disha',
         careerInterests: ['Teaching', 'Social Work'],
         schoolCollegeJob: 'Class 12 — Govt. Sr. Sec. School, Rampur',
-        lastContactDate: new Date(Date.now() - 2 * 86400000).toISOString()
+        lastContactDate: new Date(Date.now() - 2 * 86400000).toISOString(),
+        gender: 'female', maritalStatus: 'single',
+        consentGiven: true, consentDate: '2025-06-01'
       },
       {
         name: 'Rahul Meena', village: 'Kherli', contact: '9123456789',
@@ -287,7 +531,9 @@ const DataStore = (() => {
         careerInterests: ['IT', 'Data Entry'],
         schoolCollegeJob: 'Data Entry Operator — Jaipur District Office',
         alumniStatus: { outcome: 'Employed', details: 'Got govt. contract job after completing program' },
-        lastContactDate: new Date(Date.now() - 15 * 86400000).toISOString()
+        lastContactDate: new Date(Date.now() - 15 * 86400000).toISOString(),
+        gender: 'male', maritalStatus: 'single',
+        consentGiven: true, consentDate: '2025-01-15'
       },
       {
         name: 'Sunita Kumari', village: 'Bansur', contact: '9988776655',
@@ -295,7 +541,9 @@ const DataStore = (() => {
         enrollmentDate: '2025-09-10', programStage: 'enrolled',
         careerInterests: ['Nursing'],
         schoolCollegeJob: 'Class 10 — Bansur Public School',
-        lastContactDate: new Date(Date.now() - 45 * 86400000).toISOString()
+        lastContactDate: new Date(Date.now() - 45 * 86400000).toISOString(),
+        gender: 'female', maritalStatus: 'single',
+        consentGiven: false, consentDate: ''
       },
       {
         name: 'Amit Yadav', village: 'Laxmangarh', contact: '9012345678',
@@ -303,8 +551,8 @@ const DataStore = (() => {
         enrollmentDate: '2024-11-01', programStage: 'neev',
         careerInterests: ['Mechanics', 'Electrician'],
         schoolCollegeJob: 'ITI — Sikar',
-        flagged: true, flagReason: 'Family financial issues, needs scholarship support',
-        lastContactDate: new Date(Date.now() - 10 * 86400000).toISOString()
+        gender: 'male', maritalStatus: 'single',
+        consentGiven: true, consentDate: '2024-11-01'
       },
       {
         name: 'Kavita Joshi', village: 'Mandawa', contact: '9876501234',
@@ -312,7 +560,20 @@ const DataStore = (() => {
         enrollmentDate: '2025-03-20', programStage: 'disha',
         careerInterests: ['Fashion Design', 'Tailoring'],
         schoolCollegeJob: 'Class 11 — Mandawa Girls School',
-        lastContactDate: new Date(Date.now() - 5 * 86400000).toISOString()
+        lastContactDate: new Date(Date.now() - 5 * 86400000).toISOString(),
+        gender: 'female', maritalStatus: 'married',
+        consentGiven: true, consentDate: '2025-03-20'
+      },
+      {
+        name: 'Rajesh Patel', village: 'Kherli', contact: '9456712390',
+        email: 'rajesh.patel@email.com', dateOfBirth: '2004-05-10',
+        enrollmentDate: '2024-08-15', programStage: 'dropped_out',
+        careerInterests: ['Agriculture', 'Business'],
+        schoolCollegeJob: 'Helping in family farm',
+        lastContactDate: new Date(Date.now() - 120 * 86400000).toISOString(),
+        gender: 'male', maritalStatus: 'single',
+        dropoutDate: '2025-10-12', dropoutReason: 'financial',
+        consentGiven: true, consentDate: '2024-08-15'
       }
     ];
 
@@ -326,7 +587,7 @@ const DataStore = (() => {
       { studentId: createdStudents[1].id, type: 'stage_change', title: 'Moved to Alumni', details: 'Successfully completed program. Placed in govt. data entry role.', date: '2025-12-15' },
       { studentId: createdStudents[1].id, type: 'milestone', title: 'Job Placement!', details: 'Secured Data Entry Operator position at Jaipur District Office.', date: '2026-01-10' },
       { studentId: createdStudents[2].id, type: 'class', title: 'Orientation Session', details: 'Attended introductory session. Quiet but attentive.', date: '2025-09-15' },
-      { studentId: createdStudents[3].id, type: 'counseling', title: 'Financial support discussion', details: 'Family facing crop failure. Exploring scholarship options.', date: '2025-02-20' },
+      { studentId: createdStudents[3].id, type: 'counseling', title: 'Financial support discussion', details: 'Family facing crop failure. Exploring external support options.', date: '2025-02-20' },
       { studentId: createdStudents[3].id, type: 'stage_change', title: 'Moved to On Hold', details: 'Taking break due to family situation. Will resume in 2 months.', date: '2025-03-01' },
       { studentId: createdStudents[4].id, type: 'class', title: 'Basic Stitching Class', details: 'First tailoring class. Very enthusiastic, picked up basics quickly.', date: '2025-04-05' },
       { studentId: createdStudents[4].id, type: 'assessment', title: 'Practical Skills Test', details: 'Made a simple kurta independently. Excellent craftsmanship.', date: '2025-05-10' }
@@ -343,17 +604,29 @@ const DataStore = (() => {
     { email: 'staff@ekayan.org', password: 'staff123', role: 'staff', name: 'Staff Member' }
   ];
 
-  function login(email, password) {
+  function login(email, password, portalType) {
     const user = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
     if (!user) {
       throw new Error('Invalid email or password');
     }
+
+    if (portalType === 'admin' && user.role !== 'admin') {
+      throw new Error('Access denied: Staff members cannot access the Admin Console.');
+    }
+    if (portalType === 'staff' && user.role === 'admin') {
+      throw new Error('Access denied: Administrators must sign in through the Admin Console.');
+    }
+
     const session = { email: user.email, role: user.role, name: user.name };
     localStorage.setItem(USER_KEY, JSON.stringify(session));
+
+    addAuditLog('LOGIN', `User signed in successfully via ${portalType === 'admin' ? 'Admin Console' : 'Staff Portal'}`);
+
     return session;
   }
 
   function logout() {
+    addAuditLog('LOGOUT', 'User signed out');
     localStorage.removeItem(USER_KEY);
   }
 
@@ -379,9 +652,12 @@ const DataStore = (() => {
     importData,
     seedDemoData,
     migrateStages,
+    pullFromSupabase,
     login,
     logout,
-    getCurrentUser
+    getCurrentUser,
+    getAllAuditLogs,
+    addAuditLog
   };
 
 })();
