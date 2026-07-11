@@ -325,9 +325,9 @@ const DataStore = (() => {
   // ---- Supabase Sync Helpers ----
 
   async function syncAuditLogToSupabase(log) {
-    if (typeof supabase === 'undefined' || !supabase) return;
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
     try {
-      const { error } = await supabase.from('audit_logs').insert([log]);
+      const { error } = await supabaseClient.from('audit_logs').insert([log]);
       if (error) console.error('Error syncing audit log to Supabase:', error);
     } catch (err) {
       console.warn('Supabase audit log sync warning:', err);
@@ -335,7 +335,7 @@ const DataStore = (() => {
   }
 
   async function syncStudentToSupabase(student) {
-    if (typeof supabase === 'undefined' || !supabase) return;
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
     try {
       const dbStudent = {
         id: student.id,
@@ -364,7 +364,7 @@ const DataStore = (() => {
         consent_given: student.consentGiven || false,
         consent_date: student.consentDate || null
       };
-      const { error } = await supabase.from('students').upsert(dbStudent);
+      const { error } = await supabaseClient.from('students').upsert(dbStudent);
       if (error) console.error('Error syncing student to Supabase:', error);
     } catch (err) {
       console.warn('Supabase sync warning:', err);
@@ -372,9 +372,9 @@ const DataStore = (() => {
   }
 
   async function syncDeleteStudentFromSupabase(id) {
-    if (typeof supabase === 'undefined' || !supabase) return;
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
     try {
-      const { error } = await supabase.from('students').delete().eq('id', id);
+      const { error } = await supabaseClient.from('students').delete().eq('id', id);
       if (error) console.error('Error deleting student from Supabase:', error);
     } catch (err) {
       console.warn('Supabase delete warning:', err);
@@ -382,7 +382,7 @@ const DataStore = (() => {
   }
 
   async function syncEventToSupabase(event) {
-    if (typeof supabase === 'undefined' || !supabase) return;
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
     try {
       const dbEvent = {
         id: event.eventId,
@@ -393,7 +393,7 @@ const DataStore = (() => {
         date: event.date,
         created_at: event.createdAt
       };
-      const { error } = await supabase.from('events').upsert(dbEvent);
+      const { error } = await supabaseClient.from('events').upsert(dbEvent);
       if (error) console.error('Error syncing event to Supabase:', error);
     } catch (err) {
       console.warn('Supabase event sync warning:', err);
@@ -401,9 +401,9 @@ const DataStore = (() => {
   }
 
   async function syncDeleteEventFromSupabase(eventId) {
-    if (typeof supabase === 'undefined' || !supabase) return;
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
     try {
-      const { error } = await supabase.from('events').delete().eq('id', eventId);
+      const { error } = await supabaseClient.from('events').delete().eq('id', eventId);
       if (error) console.error('Error deleting event from Supabase:', error);
     } catch (err) {
       console.warn('Supabase event delete warning:', err);
@@ -411,10 +411,10 @@ const DataStore = (() => {
   }
 
   async function pullFromSupabase() {
-    if (typeof supabase === 'undefined' || !supabase) return;
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
     try {
       // 1. Fetch Students
-      const { data: dbStudents, error: sErr } = await supabase.from('students').select('*');
+      const { data: dbStudents, error: sErr } = await supabaseClient.from('students').select('*');
       if (!sErr && dbStudents) {
         const localStudents = dbStudents.map(s => ({
           id: s.id,
@@ -449,7 +449,7 @@ const DataStore = (() => {
       }
 
       // 2. Fetch Events
-      const { data: dbEvents, error: eErr } = await supabase.from('events').select('*');
+      const { data: dbEvents, error: eErr } = await supabaseClient.from('events').select('*');
       if (!eErr && dbEvents) {
         const localEvents = dbEvents.map(e => ({
           eventId: e.id,
@@ -604,20 +604,50 @@ const DataStore = (() => {
     { email: 'staff@ekayan.org', password: 'staff123', role: 'staff', name: 'Staff Member' }
   ];
 
-  function login(email, password, portalType) {
-    const user = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-    if (!user) {
-      throw new Error('Invalid email or password');
+  async function login(email, password, portalType) {
+    if (!supabaseClient) {
+      // Safe fallback if Supabase URL/key are not set yet
+      const user = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
+      if (!user) {
+        throw new Error('Invalid email or password (or Supabase not connected)');
+      }
+
+      if (portalType === 'admin' && user.role !== 'admin') {
+        throw new Error('Access denied: Staff members cannot access the Admin Console.');
+      }
+      if (portalType === 'staff' && user.role === 'admin') {
+        throw new Error('Access denied: Administrators must sign in through the Admin Console.');
+      }
+
+      const session = { email: user.email, role: user.role, name: user.name };
+      localStorage.setItem(USER_KEY, JSON.stringify(session));
+      addAuditLog('LOGIN', `User signed in successfully via Local Mock (${portalType})`);
+      return session;
     }
 
-    if (portalType === 'admin' && user.role !== 'admin') {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email: email,
+      password: password
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const user = data.user;
+    const role = user.user_metadata?.role || 'staff';
+    const name = user.user_metadata?.name || user.email.split('@')[0];
+
+    if (portalType === 'admin' && role !== 'admin') {
+      await supabaseClient.auth.signOut();
       throw new Error('Access denied: Staff members cannot access the Admin Console.');
     }
-    if (portalType === 'staff' && user.role === 'admin') {
+    if (portalType === 'staff' && role === 'admin') {
+      await supabaseClient.auth.signOut();
       throw new Error('Access denied: Administrators must sign in through the Admin Console.');
     }
 
-    const session = { email: user.email, role: user.role, name: user.name };
+    const session = { email: user.email, role: role, name: name };
     localStorage.setItem(USER_KEY, JSON.stringify(session));
 
     addAuditLog('LOGIN', `User signed in successfully via ${portalType === 'admin' ? 'Admin Console' : 'Staff Portal'}`);
@@ -625,7 +655,14 @@ const DataStore = (() => {
     return session;
   }
 
-  function logout() {
+  async function logout() {
+    if (supabaseClient) {
+      try {
+        await supabaseClient.auth.signOut();
+      } catch (err) {
+        console.warn('Supabase logout warning:', err);
+      }
+    }
     addAuditLog('LOGOUT', 'User signed out');
     localStorage.removeItem(USER_KEY);
   }

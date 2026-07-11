@@ -112,7 +112,7 @@ const App = (() => {
     if (navAudit) navAudit.style.display = isAdmin ? 'flex' : 'none';
   }
 
-  function handleLogin(e) {
+  async function handleLogin(e) {
     e.preventDefault();
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
@@ -121,8 +121,14 @@ const App = (() => {
 
     if (errorEl) errorEl.style.display = 'none';
 
+    // Show loading indicator on submit button
+    const submitBtn = document.getElementById('login-submit-btn');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Verifying...';
+    submitBtn.disabled = true;
+
     try {
-      const session = DataStore.login(email, password, portalType);
+      const session = await DataStore.login(email, password, portalType);
       Utils.showToast(`Welcome back, ${session.name}!`, 'success');
 
       document.getElementById('login-email').value = '';
@@ -143,12 +149,15 @@ const App = (() => {
         errorEl.textContent = err.message || 'Incorrect email or password. Please try again.';
         errorEl.style.display = 'block';
       }
+    } finally {
+      submitBtn.textContent = originalText;
+      submitBtn.disabled = false;
     }
   }
 
-  function handleLogout() {
+  async function handleLogout() {
     if (confirm('Are you sure you want to sign out?')) {
-      DataStore.logout();
+      await DataStore.logout();
       showLoginScreen();
       Utils.showToast('Signed out successfully.', 'info');
     }

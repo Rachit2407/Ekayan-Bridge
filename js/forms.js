@@ -493,18 +493,47 @@ const Forms = (() => {
 
     if (fileInput && fileInput.files && fileInput.files[0]) {
       const file = fileInput.files[0];
-      if (file.size > 1.5 * 1024 * 1024) {
-        if (fileError) fileError.style.display = 'block';
-        return;
-      }
       
-      const reader = new FileReader();
-      reader.onload = function(evt) {
-        assessmentData.fileName = file.name;
-        assessmentData.fileData = evt.target.result; // Base64 data URL
-        processSave();
-      };
-      reader.readAsDataURL(file);
+      if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+        const fileExt = file.name.split('.').pop();
+        const filePath = `${studentId}/${Date.now()}.${fileExt}`;
+        
+        Utils.showToast('Uploading report...', 'info');
+        
+        supabaseClient.storage
+          .from('assessment-reports')
+          .upload(filePath, file)
+          .then(({ data, error }) => {
+            if (error) {
+              Utils.showToast('Upload failed: ' + error.message, 'error');
+              return;
+            }
+            
+            const { data: { publicUrl } } = supabaseClient.storage
+              .from('assessment-reports')
+              .getPublicUrl(filePath);
+
+            assessmentData.fileName = file.name;
+            assessmentData.fileData = publicUrl;
+            processSave();
+          })
+          .catch(err => {
+            Utils.showToast('Upload failed: ' + err.message, 'error');
+          });
+      } else {
+        if (file.size > 1.5 * 1024 * 1024) {
+          if (fileError) fileError.style.display = 'block';
+          return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          assessmentData.fileName = file.name;
+          assessmentData.fileData = evt.target.result; // Base64 data URL
+          processSave();
+        };
+        reader.readAsDataURL(file);
+      }
     } else {
       processSave();
     }
