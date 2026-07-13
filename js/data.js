@@ -124,7 +124,11 @@ const DataStore = (() => {
       dropoutDate: data.dropoutDate || '',
       dropoutReason: data.dropoutReason || '',
       consentGiven: data.consentGiven === undefined ? false : data.consentGiven,
-      consentDate: data.consentDate || ''
+      consentDate: data.consentDate || '',
+      
+      parentGuardianName: data.parentGuardianName || '',
+      parentGuardianContact: data.parentGuardianContact || '',
+      parentGuardianRelation: data.parentGuardianRelation || 'parent'
     };
     
     return saveStudent(student);
@@ -362,7 +366,12 @@ const DataStore = (() => {
         dropout_date: student.dropoutDate || null,
         dropout_reason: student.dropoutReason || '',
         consent_given: student.consentGiven || false,
-        consent_date: student.consentDate || null
+        consent_date: student.consentDate || null,
+        parent_guardian_name: student.parentGuardianName || '',
+        parent_guardian_contact: student.parentGuardianContact || '',
+        parent_guardian_relation: student.parentGuardianRelation || 'parent',
+        alumni_outcome: student.alumniStatus?.outcome || null,
+        alumni_details: student.alumniStatus?.details || null
       };
       const { error } = await supabaseClient.from('students').upsert(dbStudent);
       if (error) console.error('Error syncing student to Supabase:', error);
@@ -443,7 +452,14 @@ const DataStore = (() => {
           dropoutDate: s.dropout_date || '',
           dropoutReason: s.dropout_reason || '',
           consentGiven: s.consent_given || false,
-          consentDate: s.consent_date || ''
+          consentDate: s.consent_date || '',
+          parentGuardianName: s.parent_guardian_name || '',
+          parentGuardianContact: s.parent_guardian_contact || '',
+          parentGuardianRelation: s.parent_guardian_relation || 'parent',
+          alumniStatus: (s.alumni_outcome || s.alumni_details) ? {
+            outcome: s.alumni_outcome || '',
+            details: s.alumni_details || ''
+          } : null
         }));
         localStorage.setItem(STUDENTS_KEY, JSON.stringify(localStudents));
       }
@@ -530,7 +546,7 @@ const DataStore = (() => {
         enrollmentDate: '2025-01-15', programStage: 'sampark',
         careerInterests: ['IT', 'Data Entry'],
         schoolCollegeJob: 'Data Entry Operator — Jaipur District Office',
-        alumniStatus: { outcome: 'Employed', details: 'Got govt. contract job after completing program' },
+        alumniStatus: { outcome: 'Employed (Organised)', details: 'Got govt. contract job after completing program' },
         lastContactDate: new Date(Date.now() - 15 * 86400000).toISOString(),
         gender: 'male', maritalStatus: 'single',
         consentGiven: true, consentDate: '2025-01-15'

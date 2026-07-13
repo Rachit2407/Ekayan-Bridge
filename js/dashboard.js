@@ -83,6 +83,12 @@ const Dashboard = (() => {
             <canvas id="dropout-chart"></canvas>
           </div>
         </div>
+        <div class="chart-card">
+          <div class="chart-card__title">🎓 Alumni Employment Outcomes</div>
+          <div class="chart-container-wrapper">
+            <canvas id="employment-chart"></canvas>
+          </div>
+        </div>
       </div>
 
       <!-- Alerts and Recent Feed -->
@@ -332,6 +338,47 @@ const Dashboard = (() => {
             angleLines: { color: 'rgba(255,255,255,0.05)' },
             pointLabels: { color: '#8892a4' }
           }
+        }
+      }
+    });
+
+    // 7. Employment Outcomes Chart
+    const employmentCounts = { 'Employed (Organised)': 0, 'Employed (Unorganised)': 0, 'Entrepreneur': 0, 'Higher Education': 0, 'Other': 0 };
+    students.forEach(s => {
+      if (s.programStage === 'sampark' && s.alumniStatus && s.alumniStatus.outcome) {
+        const out = s.alumniStatus.outcome;
+        if (employmentCounts.hasOwnProperty(out)) {
+          employmentCounts[out]++;
+        } else {
+          employmentCounts['Other']++;
+        }
+      }
+    });
+
+    new Chart(document.getElementById('employment-chart'), {
+      type: 'bar',
+      data: {
+        labels: ['Organised', 'Unorganised', 'Entrepreneur', 'Higher Ed', 'Other'],
+        datasets: [{
+          label: 'Alumni Count',
+          data: [
+            employmentCounts['Employed (Organised)'],
+            employmentCounts['Employed (Unorganised)'],
+            employmentCounts['Entrepreneur'],
+            employmentCounts['Higher Education'],
+            employmentCounts['Other']
+          ],
+          backgroundColor: ['#2ed573', '#ff4757', '#ffa502', '#1e90ff', '#a4b0be'],
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8892a4', stepSize: 1 } },
+          x: { grid: { display: false }, ticks: { color: '#8892a4' } }
         }
       }
     });

@@ -60,7 +60,7 @@ const Forms = (() => {
         <div class="form-row">
           <div class="form-group">
             <label>Date of Birth</label>
-            <input type="date" name="dateOfBirth">
+            <input type="date" name="dateOfBirth" onchange="Forms.handleDobChange(this)">
           </div>
           <div class="form-group">
             <label>Enrollment Date</label>
@@ -107,11 +107,36 @@ const Forms = (() => {
           <input type="text" name="careerInterests" placeholder="e.g. Teaching, Social Work, Nursing">
         </div>
 
-        <div class="form-group" style="display:flex; align-items:center; gap:10px; margin: 20px 0; background:rgba(0,230,118,0.05); padding:12px; border-radius:8px; border:1px solid rgba(0,230,118,0.1);">
-          <input type="checkbox" name="consentGiven" id="consent-add-chk" style="width:18px; height:18px; cursor:pointer;">
-          <label for="consent-add-chk" style="margin:0; cursor:pointer; color:var(--text-primary); font-size:0.85rem;">
-            Consent obtained from student for compliance & data processing
-          </label>
+        <div class="form-group" style="margin: 20px 0; background:rgba(0,230,118,0.05); padding:12px; border-radius:8px; border:1px solid rgba(0,230,118,0.1);">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <input type="checkbox" name="consentGiven" id="consent-add-chk" style="width:18px; height:18px; cursor:pointer;">
+            <label for="consent-add-chk" class="consent-label-text" style="margin:0; cursor:pointer; color:var(--text-primary); font-size:0.85rem;">
+              Consent obtained from student for compliance & data processing
+            </label>
+            <a href="#" onclick="Forms.showPrivacyNotice(event)" style="margin-left: 5px; color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: bold;">(ℹ️ View)</a>
+          </div>
+          
+          <div class="parental-consent-fields" style="display: none; margin-top: 12px; border-top: 1px dashed rgba(0,230,118,0.2); padding-top: 12px;">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Parent/Guardian Name *</label>
+                <input type="text" name="parentGuardianName" placeholder="e.g. Ramesh Sharma">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Parent/Guardian Contact</label>
+                <input type="text" name="parentGuardianContact" placeholder="e.g. 9876500000">
+              </div>
+              <div class="form-group">
+                <label>Relation</label>
+                <select name="parentGuardianRelation">
+                  <option value="parent" selected>Parent</option>
+                  <option value="guardian">Guardian</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:24px;">
@@ -141,7 +166,10 @@ const Forms = (() => {
       gender: form.gender.value,
       maritalStatus: form.maritalStatus.value,
       consentGiven: consent,
-      consentDate: consent ? new Date().toISOString().split('T')[0] : ''
+      consentDate: consent ? new Date().toISOString().split('T')[0] : '',
+      parentGuardianName: form.parentGuardianName ? form.parentGuardianName.value.trim() : '',
+      parentGuardianContact: form.parentGuardianContact ? form.parentGuardianContact.value.trim() : '',
+      parentGuardianRelation: form.parentGuardianRelation ? form.parentGuardianRelation.value : 'parent'
     };
 
     // Duplicate check
@@ -161,6 +189,8 @@ const Forms = (() => {
   function showEditStudent(studentId) {
     const s = DataStore.getStudent(studentId);
     if (!s) return;
+    const age = Utils.calculateAge(s.dateOfBirth);
+    const isMinor = (typeof age === 'number' && age < 18);
     const html = `
       <form id="edit-student-form" onsubmit="Forms.handleEditStudent(event, '${studentId}')">
         <div class="form-row">
@@ -172,7 +202,7 @@ const Forms = (() => {
           <div class="form-group"><label>Email</label><input type="email" name="email" value="${Utils.escapeHtml(s.email)}"></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>Date of Birth</label><input type="date" name="dateOfBirth" value="${Utils.toInputDate(s.dateOfBirth)}"></div>
+          <div class="form-group"><label>Date of Birth</label><input type="date" name="dateOfBirth" value="${Utils.toInputDate(s.dateOfBirth)}" onchange="Forms.handleDobChange(this)"></div>
           <div class="form-group"><label>Enrollment Date</label><input type="date" name="enrollmentDate" value="${Utils.toInputDate(s.enrollmentDate)}"></div>
         </div>
         <div class="form-row">
@@ -202,7 +232,17 @@ const Forms = (() => {
         <div class="form-group"><label>Career Interests (comma-separated)</label><input type="text" name="careerInterests" value="${(s.careerInterests || []).join(', ')}"></div>
         
         ${s.programStage === 'sampark' ? `
-        <div class="form-group"><label>Alumni Outcome</label><input type="text" name="alumniOutcome" value="${Utils.escapeHtml(s.alumniStatus?.outcome || '')}"></div>
+        <div class="form-group">
+          <label>Alumni Outcome</label>
+          <select name="alumniOutcome">
+            <option value="" ${!(s.alumniStatus?.outcome) ? 'selected' : ''}>Select Outcome...</option>
+            <option value="Employed (Organised)" ${(s.alumniStatus?.outcome === 'Employed (Organised)') ? 'selected' : ''}>Employed (Organised Sector)</option>
+            <option value="Employed (Unorganised)" ${(s.alumniStatus?.outcome === 'Employed (Unorganised)') ? 'selected' : ''}>Employed (Unorganised Sector)</option>
+            <option value="Entrepreneur" ${(s.alumniStatus?.outcome === 'Entrepreneur') ? 'selected' : ''}>Entrepreneur</option>
+            <option value="Higher Education" ${(s.alumniStatus?.outcome === 'Higher Education') ? 'selected' : ''}>Higher Education</option>
+            <option value="Other" ${(s.alumniStatus?.outcome === 'Other') ? 'selected' : ''}>Other</option>
+          </select>
+        </div>
         <div class="form-group"><label>Alumni Details</label><textarea name="alumniDetails">${Utils.escapeHtml(s.alumniStatus?.details || '')}</textarea></div>
         ` : ''}
 
@@ -223,11 +263,36 @@ const Forms = (() => {
         </div>
         ` : ''}
 
-        <div class="form-group" style="display:flex; align-items:center; gap:10px; margin: 20px 0; background:rgba(0,230,118,0.05); padding:12px; border-radius:8px; border:1px solid rgba(0,230,118,0.1);">
-          <input type="checkbox" name="consentGiven" id="consent-edit-chk" ${s.consentGiven ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer;">
-          <label for="consent-edit-chk" style="margin:0; cursor:pointer; color:var(--text-primary); font-size:0.85rem;">
-            Consent obtained from student for compliance & data processing
-          </label>
+        <div class="form-group" style="margin: 20px 0; background:rgba(0,230,118,0.05); padding:12px; border-radius:8px; border:1px solid rgba(0,230,118,0.1);">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <input type="checkbox" name="consentGiven" id="consent-edit-chk" ${s.consentGiven ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer;">
+            <label for="consent-edit-chk" class="consent-label-text" style="margin:0; cursor:pointer; color:var(--text-primary); font-size:0.85rem;">
+              ${isMinor ? 'Verifiable Parental/Guardian Consent obtained for compliance & data processing' : 'Consent obtained from student for compliance & data processing'}
+            </label>
+            <a href="#" onclick="Forms.showPrivacyNotice(event)" style="margin-left: 5px; color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: bold;">(ℹ️ View)</a>
+          </div>
+          
+          <div class="parental-consent-fields" style="display: ${isMinor ? 'block' : 'none'}; margin-top: 12px; border-top: 1px dashed rgba(0,230,118,0.2); padding-top: 12px;">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Parent/Guardian Name *</label>
+                <input type="text" name="parentGuardianName" value="${Utils.escapeHtml(s.parentGuardianName || '')}" ${isMinor ? 'required' : ''} placeholder="e.g. Ramesh Sharma">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Parent/Guardian Contact</label>
+                <input type="text" name="parentGuardianContact" value="${Utils.escapeHtml(s.parentGuardianContact || '')}" placeholder="e.g. 9876500000">
+              </div>
+              <div class="form-group">
+                <label>Relation</label>
+                <select name="parentGuardianRelation">
+                  <option value="parent" ${s.parentGuardianRelation === 'parent' ? 'selected' : ''}>Parent</option>
+                  <option value="guardian" ${s.parentGuardianRelation === 'guardian' ? 'selected' : ''}>Guardian</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:24px;">
@@ -256,7 +321,10 @@ const Forms = (() => {
       gender: form.gender.value,
       maritalStatus: form.maritalStatus.value,
       consentGiven: consent,
-      consentDate: consent ? (DataStore.getStudent(studentId).consentDate || new Date().toISOString().split('T')[0]) : ''
+      consentDate: consent ? (DataStore.getStudent(studentId).consentDate || new Date().toISOString().split('T')[0]) : '',
+      parentGuardianName: form.parentGuardianName ? form.parentGuardianName.value.trim() : '',
+      parentGuardianContact: form.parentGuardianContact ? form.parentGuardianContact.value.trim() : '',
+      parentGuardianRelation: form.parentGuardianRelation ? form.parentGuardianRelation.value : 'parent',
     };
 
     if (form.alumniOutcome) {
@@ -341,7 +409,14 @@ const Forms = (() => {
         
         <div class="form-group" id="alumni-fields" style="display:none;">
           <label>Alumni Outcome</label>
-          <input type="text" name="alumniOutcome" placeholder="e.g. Employed, Higher Studies" value="${Utils.escapeHtml(s.alumniStatus?.outcome || '')}">
+          <select name="alumniOutcome">
+            <option value="" ${!(s.alumniStatus?.outcome) ? 'selected' : ''}>Select Outcome...</option>
+            <option value="Employed (Organised)" ${(s.alumniStatus?.outcome === 'Employed (Organised)') ? 'selected' : ''}>Employed (Organised Sector)</option>
+            <option value="Employed (Unorganised)" ${(s.alumniStatus?.outcome === 'Employed (Unorganised)') ? 'selected' : ''}>Employed (Unorganised Sector)</option>
+            <option value="Entrepreneur" ${(s.alumniStatus?.outcome === 'Entrepreneur') ? 'selected' : ''}>Entrepreneur</option>
+            <option value="Higher Education" ${(s.alumniStatus?.outcome === 'Higher Education') ? 'selected' : ''}>Higher Education</option>
+            <option value="Other" ${(s.alumniStatus?.outcome === 'Other') ? 'selected' : ''}>Other</option>
+          </select>
           <label style="margin-top:10px;">Details</label>
           <textarea name="alumniDetails" placeholder="Details about placement or next steps...">${Utils.escapeHtml(s.alumniStatus?.details || '')}</textarea>
         </div>
@@ -588,6 +663,65 @@ const Forms = (() => {
     }, 50);
   }
 
+  function handleDobChange(input) {
+    const dobVal = input.value;
+    const age = Utils.calculateAge(dobVal);
+    const form = input.closest('form');
+    if (!form) return;
+
+    const parentalFields = form.querySelector('.parental-consent-fields');
+    const consentLabel = form.querySelector('.consent-label-text');
+    
+    if (parentalFields && consentLabel) {
+      if (typeof age === 'number' && age < 18) {
+        parentalFields.style.display = 'block';
+        const nameInput = parentalFields.querySelector('input[name="parentGuardianName"]');
+        if (nameInput) nameInput.required = true;
+        consentLabel.innerHTML = 'Verifiable Parental/Guardian Consent obtained for compliance & data processing';
+      } else {
+        parentalFields.style.display = 'none';
+        const nameInput = parentalFields.querySelector('input[name="parentGuardianName"]');
+        if (nameInput) nameInput.required = false;
+        consentLabel.innerHTML = 'Consent obtained from student for compliance & data processing';
+      }
+    }
+  }
+
+  function showPrivacyNotice(e) {
+    if (e) e.preventDefault();
+    const noticeHtml = `
+      <div style="font-size:0.95rem; line-height:1.6; color:var(--text-secondary);">
+        <p><strong>Ekayan Foundation Data Privacy & Compliance Notice</strong></p>
+        <p>We collect and process student personal data (such as name, contact details, date of birth, village, academic scores, and career outcomes) strictly for the following purposes:</p>
+        <ul style="padding-left: 20px; margin: 10px 0;">
+          <li>Monitoring student academic growth and program progression.</li>
+          <li>Providing career counseling, mentorship, and fellowship assistance.</li>
+          <li>Tracking alumni employment outcomes (organised/unorganised sector, entrepreneurship).</li>
+          <li>Assisting with external scholarship coordination.</li>
+        </ul>
+        <p>All data is stored securely in our database. We do not share student personal information with external third parties without prior authorization. Under the <strong>DPDP Act 2023</strong>, you have the right to request access to, correction of, or erasure of your personal data at any time.</p>
+        <div style="display:flex; justify-content:flex-end; margin-top:20px;">
+          <button class="btn btn--primary" onclick="document.getElementById('dialog-overlay-notice').remove();">Close Notice</button>
+        </div>
+      </div>
+    `;
+    
+    let overlay = document.getElementById('dialog-overlay-notice');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'dialog-overlay-notice';
+      overlay.className = 'modal-overlay modal-overlay--active';
+      overlay.style.zIndex = '10001';
+      document.body.appendChild(overlay);
+    }
+    overlay.innerHTML = `
+      <div class="modal" style="max-width: 500px; border-top: 4px solid var(--accent); z-index: 10002;">
+        <h3 class="modal__title" style="margin-bottom:15px; color:var(--text-primary);">Data Privacy Notice</h3>
+        ${noticeHtml}
+      </div>
+    `;
+  }
+
   function handleFollowUp(e, studentId) {
     e.preventDefault();
     const form = e.target;
@@ -613,6 +747,7 @@ const Forms = (() => {
     showAddEvent, handleAddEvent,
     showChangeStage, handleChangeStage,
     showAddAssessment, handleAddAssessment,
-    showFollowUpModal, handleFollowUp
+    showFollowUpModal, handleFollowUp,
+    handleDobChange, showPrivacyNotice
   };
 })();
