@@ -101,6 +101,25 @@ const Forms = (() => {
           </div>
         </div>
 
+        <div class="form-row">
+          <div class="form-group">
+            <label>Course Name</label>
+            <input type="text" name="courseName" placeholder="e.g. B.A. English, Diploma in IT">
+          </div>
+          <div class="form-group">
+            <label>Course Year</label>
+            <select name="courseYear">
+              <option value="" selected>Select Course Year...</option>
+              <option value="1st Year">1st Year</option>
+              <option value="2nd Year">2nd Year</option>
+              <option value="3rd Year">3rd Year</option>
+              <option value="4th Year">4th Year</option>
+              <option value="5th Year">5th Year</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+
 
         <div class="form-group">
           <label>Career Interests (comma-separated)</label>
@@ -169,7 +188,9 @@ const Forms = (() => {
       consentDate: consent ? new Date().toISOString().split('T')[0] : '',
       parentGuardianName: form.parentGuardianName ? form.parentGuardianName.value.trim() : '',
       parentGuardianContact: form.parentGuardianContact ? form.parentGuardianContact.value.trim() : '',
-      parentGuardianRelation: form.parentGuardianRelation ? form.parentGuardianRelation.value : 'parent'
+      parentGuardianRelation: form.parentGuardianRelation ? form.parentGuardianRelation.value : 'parent',
+      courseName: form.courseName ? form.courseName.value.trim() : '',
+      courseYear: form.courseYear ? form.courseYear.value : ''
     };
 
     // Duplicate check
@@ -227,6 +248,25 @@ const Forms = (() => {
           </div>
         </div>
         <div class="form-group"><label>School / College / Job</label><input type="text" name="schoolCollegeJob" value="${Utils.escapeHtml(s.schoolCollegeJob)}"></div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Course Name</label>
+            <input type="text" name="courseName" value="${Utils.escapeHtml(s.courseName || '')}" placeholder="e.g. B.A. English, Diploma in IT">
+          </div>
+          <div class="form-group">
+            <label>Course Year</label>
+            <select name="courseYear">
+              <option value="" ${s.courseYear === '' ? 'selected' : ''}>Select Course Year...</option>
+              <option value="1st Year" ${s.courseYear === '1st Year' ? 'selected' : ''}>1st Year</option>
+              <option value="2nd Year" ${s.courseYear === '2nd Year' ? 'selected' : ''}>2nd Year</option>
+              <option value="3rd Year" ${s.courseYear === '3rd Year' ? 'selected' : ''}>3rd Year</option>
+              <option value="4th Year" ${s.courseYear === '4th Year' ? 'selected' : ''}>4th Year</option>
+              <option value="5th Year" ${s.courseYear === '5th Year' ? 'selected' : ''}>5th Year</option>
+              <option value="Other" ${s.courseYear === 'Other' ? 'selected' : ''}>Other</option>
+            </select>
+          </div>
+        </div>
 
 
         <div class="form-group"><label>Career Interests (comma-separated)</label><input type="text" name="careerInterests" value="${(s.careerInterests || []).join(', ')}"></div>
@@ -325,6 +365,8 @@ const Forms = (() => {
       parentGuardianName: form.parentGuardianName ? form.parentGuardianName.value.trim() : '',
       parentGuardianContact: form.parentGuardianContact ? form.parentGuardianContact.value.trim() : '',
       parentGuardianRelation: form.parentGuardianRelation ? form.parentGuardianRelation.value : 'parent',
+      courseName: form.courseName ? form.courseName.value.trim() : '',
+      courseYear: form.courseYear ? form.courseYear.value : ''
     };
 
     if (form.alumniOutcome) {

@@ -1,0 +1,112 @@
+EKAYAN BRIDGE — RELATIONAL DATABASE SCHEMA & DESIGN (VERIFIED LIVE)
+==================================================================
+
+This document outlines the verified relational database structure and columns 
+for the Ekayan Student Dashboard, extracted directly from the live Supabase (PostgreSQL) instance.
+
+------------------------------------------------------------------
+1. TABLE: students
+------------------------------------------------------------------
+Stores primary demographics, educational levels, placement metrics, and DPDP compliance consent flags.
+
+Columns:
+  * id (text) [PRIMARY KEY, NOT NULL]
+    Unique student ID (format: CF-YYYY-XXXX).
+  * name (text) [NOT NULL]
+    Full name of the student.
+  * village (text) [NULLABLE]
+    Village name for geographic tracking and reporting.
+  * contact (text) [NULLABLE]
+    Mobile contact number (automatically masked in UI for Staff).
+  * email (text) [NULLABLE]
+    Email address (automatically masked in UI for Staff).
+  * date_of_birth (date) [NULLABLE]
+    Birth date (used to calculate minor/adult status dynamically).
+  * enrollment_date (date) [NOT NULL]
+    Date the student joined the program.
+  * program_stage (text) [NOT NULL, DEFAULT 'enrolled']
+    Stages: enrolled, neev, disha, nirmaan, sampark (Alumni), dropped_out.
+  * school_college_job (text) [NULLABLE]
+    Active educational institution or current employment details.
+  * career_interests (ARRAY) [NULLABLE]
+    List of student career interests/fields.
+  * flagged (boolean) [NULLABLE, DEFAULT false]
+    True if the student requires urgent counselor intervention.
+  * flag_reason (text) [NULLABLE]
+    Reason explaining why the student was flagged.
+  * follow_up_required (boolean) [NULLABLE, DEFAULT false]
+    Indicates if a follow-up action is pending.
+  * follow_up_notes (text) [NULLABLE]
+    Notes concerning the follow-up task.
+  * follow_up_assigned_to (text) [NULLABLE]
+    Staff email address assigned to run the follow-up.
+  * follow_up_date (date) [NULLABLE]
+    Expected target resolution date.
+  * created_at (timestamp with time zone) [NOT NULL, DEFAULT timezone('utc', now())]
+    Automatic creation timestamp.
+  * updated_at (timestamp with time zone) [NOT NULL, DEFAULT timezone('utc', now())]
+    Automatic last modification timestamp.
+  * assessments (jsonb) [NULLABLE, DEFAULT '[]']
+    Array of assessments containing scores, subjects, and attachment paths.
+  * gender (text) [NULLABLE, DEFAULT 'prefer_not_to_say']
+    Demographics: male, female, other, prefer_not_to_say.
+  * marital_status (text) [NULLABLE, DEFAULT 'prefer_not_to_say']
+    Demographics: single, married, divorced, widowed, prefer_not_to_say.
+  * dropout_date (date) [NULLABLE]
+    Logged when program_stage is set to 'dropped_out'.
+  * dropout_reason (text) [NULLABLE, DEFAULT '']
+    e.g., financial, academic, family, employment, marriage, other.
+  * consent_given (boolean) [NULLABLE, DEFAULT false]
+    DPDP privacy agreement checkbox status.
+  * consent_date (date) [NULLABLE]
+    Date when data privacy consent was signed.
+  * parent_guardian_name (text) [NULLABLE]
+    Required if student is a minor (< 18).
+  * parent_guardian_contact (text) [NULLABLE]
+    Guardian contact number for minor students.
+  * parent_guardian_relation (text) [NULLABLE, DEFAULT 'parent']
+    Relation to student (e.g. mother, father, uncle).
+  * alumni_outcome (text) [NULLABLE]
+    Modern outcomes: Employed (Organised), Employed (Unorganised), Entrepreneur, Higher Education, Other.
+  * alumni_details (text) [NULLABLE]
+    Contextual details for their alumni outcome.
+
+------------------------------------------------------------------
+2. TABLE: events
+------------------------------------------------------------------
+Tracks counselor logs, updates, and student milestones (referential log).
+
+Columns:
+  * id (text) [PRIMARY KEY, NOT NULL, DEFAULT gen_random_uuid()]
+    Unique log ID (UUID).
+  * student_id (text) [FOREIGN KEY referencing students.id, NOT NULL]
+    Identifies the target student. Deletes automatically if the student is deleted (ON DELETE CASCADE).
+  * type (text) [NOT NULL]
+    Type of activity (e.g., stage_change, notes, assessment).
+  * title (text) [NOT NULL]
+    Header of the log entry.
+  * details (text) [NULLABLE]
+    Description text.
+  * date (timestamp with time zone) [NOT NULL]
+    Activity date.
+  * created_at (timestamp with time zone) [NOT NULL, DEFAULT timezone('utc', now())]
+    Database timestamp.
+
+------------------------------------------------------------------
+3. TABLE: audit_logs
+------------------------------------------------------------------
+Tracks user operations for accountability.
+
+Columns:
+  * id (text) [PRIMARY KEY, NOT NULL]
+    Unique audit ID.
+  * timestamp (timestamp with time zone) [NOT NULL, DEFAULT timezone('utc', now())]
+    Time of operation.
+  * user (text) [NOT NULL]
+    Email address of the administrator/staff who performed the operation.
+  * role (text) [NOT NULL]
+    User role at the time of log (admin or staff).
+  * action (text) [NOT NULL]
+    Type of action (e.g. ADD_STUDENT, DELETE_STUDENT, EDIT_STUDENT).
+  * details (text) [NULLABLE]
+    Details listing the modified fields.

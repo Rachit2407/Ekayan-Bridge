@@ -158,6 +158,14 @@ const Profile = (() => {
             <span class="info-item__label">Current Institution / Job Role</span>
             <span class="info-item__value">${Utils.escapeHtml(s.schoolCollegeJob || 'Not specified')}</span>
           </div>
+          <div class="info-item">
+            <span class="info-item__label">Course Name</span>
+            <span class="info-item__value">${Utils.escapeHtml(s.courseName || 'Not specified')}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-item__label">Course Year</span>
+            <span class="info-item__value">${Utils.escapeHtml(s.courseYear || 'Not specified')}</span>
+          </div>
           <div class="info-item" style="grid-column: span 2;">
             <span class="info-item__label">Career Interests</span>
             <div style="margin-top: 6px; display:flex; gap:6px; flex-wrap:wrap;">

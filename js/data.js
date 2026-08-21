@@ -128,7 +128,9 @@ const DataStore = (() => {
       
       parentGuardianName: data.parentGuardianName || '',
       parentGuardianContact: data.parentGuardianContact || '',
-      parentGuardianRelation: data.parentGuardianRelation || 'parent'
+      parentGuardianRelation: data.parentGuardianRelation || 'parent',
+      courseName: data.courseName || '',
+      courseYear: data.courseYear || ''
     };
     
     return saveStudent(student);
@@ -371,7 +373,9 @@ const DataStore = (() => {
         parent_guardian_contact: student.parentGuardianContact || '',
         parent_guardian_relation: student.parentGuardianRelation || 'parent',
         alumni_outcome: student.alumniStatus?.outcome || null,
-        alumni_details: student.alumniStatus?.details || null
+        alumni_details: student.alumniStatus?.details || null,
+        course_name: student.courseName || '',
+        course_year: student.courseYear || ''
       };
       const { error } = await supabaseClient.from('students').upsert(dbStudent);
       if (error) console.error('Error syncing student to Supabase:', error);
@@ -459,7 +463,9 @@ const DataStore = (() => {
           alumniStatus: (s.alumni_outcome || s.alumni_details) ? {
             outcome: s.alumni_outcome || '',
             details: s.alumni_details || ''
-          } : null
+          } : null,
+          courseName: s.course_name || '',
+          courseYear: s.course_year || ''
         }));
         localStorage.setItem(STUDENTS_KEY, JSON.stringify(localStudents));
       }
