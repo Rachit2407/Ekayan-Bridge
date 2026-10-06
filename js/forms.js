@@ -792,17 +792,26 @@ const Forms = (() => {
 
         <div class="form-group" style="margin-bottom:14px;">
           <label style="color:var(--text-secondary); font-size:0.85rem; display:block; margin-bottom:6px;">Current Master Key *</label>
-          <input type="password" name="currentKey" required placeholder="Enter active key" style="width:100%; padding:10px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:6px; color:var(--text-primary);">
+          <div style="position:relative; display:flex; align-items:center;">
+            <input type="password" name="currentKey" id="rotate-current-key" required placeholder="Enter active key" style="width:100%; padding:10px 40px 10px 12px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-size:0.9rem;">
+            <button type="button" onclick="const i=document.getElementById('rotate-current-key'); i.type = i.type==='password'?'text':'password'; this.textContent=i.type==='password'?'👁️':'🙈';" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; font-size:1rem; opacity:0.7; padding:2px;">👁️</button>
+          </div>
         </div>
 
         <div class="form-group" style="margin-bottom:14px;">
           <label style="color:var(--text-secondary); font-size:0.85rem; display:block; margin-bottom:6px;">New Master Key (min. 6 characters) *</label>
-          <input type="password" name="newKey" required minlength="6" placeholder="Enter new secret key" style="width:100%; padding:10px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:6px; color:var(--text-primary);">
+          <div style="position:relative; display:flex; align-items:center;">
+            <input type="password" name="newKey" id="rotate-new-key" required minlength="6" placeholder="Enter new secret key" style="width:100%; padding:10px 40px 10px 12px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-size:0.9rem;">
+            <button type="button" onclick="const i=document.getElementById('rotate-new-key'); i.type = i.type==='password'?'text':'password'; this.textContent=i.type==='password'?'👁️':'🙈';" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; font-size:1rem; opacity:0.7; padding:2px;">👁️</button>
+          </div>
         </div>
 
         <div class="form-group" style="margin-bottom:20px;">
           <label style="color:var(--text-secondary); font-size:0.85rem; display:block; margin-bottom:6px;">Confirm New Master Key *</label>
-          <input type="password" name="confirmNewKey" required minlength="6" placeholder="Re-type new secret key" style="width:100%; padding:10px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:6px; color:var(--text-primary);">
+          <div style="position:relative; display:flex; align-items:center;">
+            <input type="password" name="confirmNewKey" id="rotate-confirm-key" required minlength="6" placeholder="Re-type new secret key" style="width:100%; padding:10px 40px 10px 12px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-size:0.9rem;">
+            <button type="button" onclick="const i=document.getElementById('rotate-confirm-key'); i.type = i.type==='password'?'text':'password'; this.textContent=i.type==='password'?'👁️':'🙈';" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; font-size:1rem; opacity:0.7; padding:2px;">👁️</button>
+          </div>
         </div>
 
         <div style="display:flex; justify-content:flex-end; gap:10px;">
