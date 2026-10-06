@@ -782,6 +782,76 @@ const Forms = (() => {
     Profile.render(studentId);
   }
 
+  function showRotateMasterKey() {
+    const html = `
+      <form id="rotate-key-form" onsubmit="Forms.handleRotateMasterKey(event)">
+        <div style="background:rgba(255,165,2,0.1); border:1px solid rgba(255,165,2,0.3); border-radius:8px; padding:12px; margin-bottom:16px; font-size:0.85rem; color:#fbc531; line-height:1.4;">
+          ⚠️ <strong>Master Key Rotation</strong><br>
+          This will re-encrypt all student records in Supabase with the new Master Key. All staff members must use the new key on their next login.
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px;">
+          <label style="color:var(--text-secondary); font-size:0.85rem; display:block; margin-bottom:6px;">Current Master Key *</label>
+          <input type="password" name="currentKey" required placeholder="Enter active key" style="width:100%; padding:10px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:6px; color:var(--text-primary);">
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px;">
+          <label style="color:var(--text-secondary); font-size:0.85rem; display:block; margin-bottom:6px;">New Master Key (min. 6 characters) *</label>
+          <input type="password" name="newKey" required minlength="6" placeholder="Enter new secret key" style="width:100%; padding:10px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:6px; color:var(--text-primary);">
+        </div>
+
+        <div class="form-group" style="margin-bottom:20px;">
+          <label style="color:var(--text-secondary); font-size:0.85rem; display:block; margin-bottom:6px;">Confirm New Master Key *</label>
+          <input type="password" name="confirmNewKey" required minlength="6" placeholder="Re-type new secret key" style="width:100%; padding:10px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:6px; color:var(--text-primary);">
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button type="button" class="btn" onclick="Forms.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn--primary" id="btn-submit-rotate-key" style="background:linear-gradient(135deg, #f59e0b, #d97706);">
+            🔐 Re-encrypt & Rotate Key
+          </button>
+        </div>
+      </form>
+    `;
+    showModal('🔑 Rotate Master Encryption Key', html);
+  }
+
+  async function handleRotateMasterKey(e) {
+    e.preventDefault();
+    const form = e.target;
+    const currentKey = form.currentKey.value;
+    const newKey = form.newKey.value;
+    const confirmNewKey = form.confirmNewKey.value;
+
+    if (newKey !== confirmNewKey) {
+      Utils.showToast('New keys do not match. Please re-enter.', 'error');
+      return;
+    }
+
+    if (newKey === currentKey) {
+      Utils.showToast('New key must be different from current key.', 'error');
+      return;
+    }
+
+    const btn = document.getElementById('btn-submit-rotate-key');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Rotating & Encrypting...';
+    }
+
+    try {
+      const count = await DataStore.rotateMasterKey(currentKey, newKey);
+      closeModal();
+      Utils.showToast(`✅ Key rotated! ${count} records re-encrypted with the new key.`, 'success');
+    } catch (err) {
+      Utils.showToast(err.message || 'Key rotation failed.', 'error');
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '🔐 Re-encrypt & Rotate Key';
+      }
+    }
+  }
+
   return {
     showModal, closeModal,
     showAddStudent, handleAddStudent,
@@ -790,6 +860,7 @@ const Forms = (() => {
     showChangeStage, handleChangeStage,
     showAddAssessment, handleAddAssessment,
     showFollowUpModal, handleFollowUp,
-    handleDobChange, showPrivacyNotice
+    handleDobChange, showPrivacyNotice,
+    showRotateMasterKey, handleRotateMasterKey
   };
 })();

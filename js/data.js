@@ -718,6 +718,39 @@ const DataStore = (() => {
     return count;
   }
 
+  /**
+   * Admin Key Rotation: Re-encrypts all local records with a new master key,
+   * updates the sentinel, sets window.EKAYAN_MASTER_KEY, and syncs to Supabase.
+   */
+  async function rotateMasterKey(currentKeyCandidate, newKey) {
+    if (!currentKeyCandidate || !newKey) {
+      throw new Error('Both current key and new key are required.');
+    }
+    if (newKey.length < 6) {
+      throw new Error('New master key must be at least 6 characters long.');
+    }
+    // Verify current key first
+    const isCurrentValid = Utils.verifyKey(currentKeyCandidate);
+    if (!isCurrentValid) {
+      throw new Error('Verification failed: Current Master Key is incorrect.');
+    }
+
+    const students = getAllStudents();
+    
+    // Switch active key to newKey
+    window.EKAYAN_MASTER_KEY = newKey;
+    Utils.updateMasterKeySentinel(newKey);
+
+    let count = 0;
+    for (const student of students) {
+      await syncStudentToSupabase(student);
+      count++;
+    }
+
+    addAuditLog('SECURITY', `Master Encryption Key rotated by Admin. Re-encrypted ${count} student records in Supabase.`);
+    return count;
+  }
+
   return {
     getAllStudents,
     getStudent,
@@ -742,7 +775,8 @@ const DataStore = (() => {
     getCurrentUser,
     getAllAuditLogs,
     addAuditLog,
-    reencryptAllStudents
+    reencryptAllStudents,
+    rotateMasterKey
   };
 
 })();

@@ -61,10 +61,13 @@ const Reports = (() => {
 
           <h4 style="margin-bottom:12px; color:var(--text-primary);">🔐 Security & Vault</h4>
           <div style="display:flex; flex-direction:column; gap:8px;">
-            <button class="btn" onclick="Reports.triggerReencryption()" style="font-size:0.8rem; padding:10px; background:rgba(30,144,255,0.15); border:1px solid rgba(30,144,255,0.3); color:#60a5fa; font-weight:600;">
-              🔄 Encrypt Existing Records
+            <button class="btn" onclick="Reports.triggerReencryption()" style="font-size:0.8rem; padding:9px; background:rgba(30,144,255,0.15); border:1px solid rgba(30,144,255,0.3); color:#60a5fa; font-weight:600;">
+              🔄 Re-encrypt All Records
             </button>
-            <span style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">Syncs & encrypts any unencrypted legacy records with the active Master Key.</span>
+            <button class="btn" onclick="Forms.showRotateMasterKey()" style="font-size:0.8rem; padding:9px; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); color:#fbbf24; font-weight:600;">
+              🔑 Change Master Key
+            </button>
+            <span style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">Safely rotate the secret Master Key across all database records.</span>
           </div>
         </div>
 

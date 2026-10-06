@@ -63,6 +63,15 @@ const Utils = (() => {
   }
 
   /**
+   * Updates the persistent sentinel with a new master key.
+   */
+  function updateMasterKeySentinel(newKey) {
+    if (!newKey) throw new Error('New master key cannot be empty.');
+    const encrypted = CryptoJS.AES.encrypt(SENTINEL_PLAINTEXT, newKey).toString();
+    localStorage.setItem(SENTINEL_STORAGE_KEY, encrypted);
+  }
+
+  /**
    * Generate a unique student ID in format CF-YYYY-NNNN
    * Reads existing students to find the next sequential number
    */
@@ -445,7 +454,8 @@ const Utils = (() => {
     showErrorDialog,
     encryptData,
     decryptData,
-    verifyKey
+    verifyKey,
+    updateMasterKeySentinel
   };
 
 })();
