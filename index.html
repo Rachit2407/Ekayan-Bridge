@@ -12,6 +12,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Chart.js CDN for analytics -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- CryptoJS for Zero-Trust Client-Side Encryption -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
   <script src="js/config.js"></script>
 
 </head>
@@ -123,6 +125,26 @@
         <div id="help-credentials-staff">🔑 staff@ekayan.org / staff123 (Staff)</div>
         <div id="help-credentials-admin" style="display:none;">🔑 admin@ekayan.org / admin123 (Admin)</div>
       </div>
+    </div>
+  </div>
+
+  <!-- Master Key Overlay -->
+  <div class="login-overlay" id="master-key-overlay" style="display:none; z-index:2000; align-items:center; justify-content:center;">
+    <div class="login-card" style="max-width: 450px;">
+      <div class="login-card__header">
+        <h2 class="login-card__title">🔒 Unlock Database</h2>
+        <p class="login-card__subtitle">Enter the Master Encryption Key to decrypt student data locally. This key is never sent to the server.</p>
+      </div>
+      <form id="master-key-form" onsubmit="App.handleMasterKey(event)">
+        <div id="master-key-error" style="display:none; color:var(--danger); background:rgba(255,71,87,0.1); border:1px solid rgba(255,71,87,0.2); padding:10px; border-radius:8px; font-size:0.85rem; margin-bottom:16px; text-align:center; font-weight:500;">
+          Invalid key or decryption failed.
+        </div>
+        <div class="form-group">
+          <label style="color:var(--text-secondary); font-weight:500; font-size:0.85rem; display:block; margin-bottom:6px;">Master Key</label>
+          <input type="password" id="master-key-input" required placeholder="••••••••" style="width:100%; padding:10px 12px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; color:var(--text-primary); font-size:0.9rem;">
+        </div>
+        <button type="submit" class="btn btn--primary" style="margin-top:24px; width:100%; padding:12px; font-size:1rem; font-weight:600; display:flex; justify-content:center; align-items:center;">Decrypt & Enter Dashboard</button>
+      </form>
     </div>
   </div>
 

@@ -345,10 +345,10 @@ const DataStore = (() => {
     try {
       const dbStudent = {
         id: student.id,
-        name: student.name,
+        name: Utils.encryptData(student.name),
         village: student.village,
-        contact: student.contact,
-        email: student.email,
+        contact: Utils.encryptData(student.contact),
+        email: Utils.encryptData(student.email),
         date_of_birth: student.dateOfBirth || null,
         enrollment_date: student.enrollmentDate,
         program_stage: student.programStage,
@@ -369,8 +369,8 @@ const DataStore = (() => {
         dropout_reason: student.dropoutReason || '',
         consent_given: student.consentGiven || false,
         consent_date: student.consentDate || null,
-        parent_guardian_name: student.parentGuardianName || '',
-        parent_guardian_contact: student.parentGuardianContact || '',
+        parent_guardian_name: Utils.encryptData(student.parentGuardianName || ''),
+        parent_guardian_contact: Utils.encryptData(student.parentGuardianContact || ''),
         parent_guardian_relation: student.parentGuardianRelation || 'parent',
         alumni_outcome: student.alumniStatus?.outcome || null,
         alumni_details: student.alumniStatus?.details || null,
@@ -431,10 +431,10 @@ const DataStore = (() => {
       if (!sErr && dbStudents) {
         const localStudents = dbStudents.map(s => ({
           id: s.id,
-          name: s.name,
+          name: Utils.decryptData(s.name),
           village: s.village,
-          contact: s.contact,
-          email: s.email,
+          contact: Utils.decryptData(s.contact),
+          email: Utils.decryptData(s.email),
           dateOfBirth: s.date_of_birth,
           enrollmentDate: s.enrollment_date,
           programStage: s.program_stage,
@@ -457,8 +457,8 @@ const DataStore = (() => {
           dropoutReason: s.dropout_reason || '',
           consentGiven: s.consent_given || false,
           consentDate: s.consent_date || '',
-          parentGuardianName: s.parent_guardian_name || '',
-          parentGuardianContact: s.parent_guardian_contact || '',
+          parentGuardianName: Utils.decryptData(s.parent_guardian_name || ''),
+          parentGuardianContact: Utils.decryptData(s.parent_guardian_contact || ''),
           parentGuardianRelation: s.parent_guardian_relation || 'parent',
           alumniStatus: (s.alumni_outcome || s.alumni_details) ? {
             outcome: s.alumni_outcome || '',
@@ -687,10 +687,35 @@ const DataStore = (() => {
     }
     addAuditLog('LOGOUT', 'User signed out');
     localStorage.removeItem(USER_KEY);
+    // Security: Clear decrypted student cache and in-memory master key
+    localStorage.removeItem(STUDENTS_KEY);
+    localStorage.removeItem(EVENTS_KEY);
+    window.EKAYAN_MASTER_KEY = null;
   }
 
   function getCurrentUser() {
     return JSON.parse(localStorage.getItem(USER_KEY) || 'null');
+  }
+
+  /**
+   * One-time Admin utility: Iterates over all students in local memory
+   * and pushes them to Supabase (which encrypts them with active Master Key).
+   */
+  async function reencryptAllStudents() {
+    const students = getAllStudents();
+    if (!students || students.length === 0) {
+      throw new Error('No students found in local store to encrypt.');
+    }
+    if (!window.EKAYAN_MASTER_KEY) {
+      throw new Error('Master key not active in memory.');
+    }
+    let count = 0;
+    for (const student of students) {
+      await syncStudentToSupabase(student);
+      count++;
+    }
+    addAuditLog('SECURITY', `Re-encrypted and synced ${count} student records with Zero-Trust Master Key.`);
+    return count;
   }
 
   return {
@@ -716,7 +741,8 @@ const DataStore = (() => {
     logout,
     getCurrentUser,
     getAllAuditLogs,
-    addAuditLog
+    addAuditLog,
+    reencryptAllStudents
   };
 
 })();

@@ -14,16 +14,64 @@ const App = (() => {
       return;
     }
 
+    if (!window.EKAYAN_MASTER_KEY) {
+      showMasterKeyScreen();
+      return;
+    }
+
     hideLoginScreen();
+    hideMasterKeyScreen();
     applyRolePermissions(user);
 
     // Auto-flag inactive students on load
     DataStore.autoFlagInactive(30);
-    // Seed demo data if empty
+    // Seed demo data if empty (triggers Supabase pull)
     DataStore.seedDemoData();
 
     renderShell();
     navigate('dashboard');
+  }
+
+  function showMasterKeyScreen() {
+    document.getElementById('master-key-overlay').style.display = 'flex';
+    document.querySelector('.app').style.display = 'none';
+  }
+
+  function hideMasterKeyScreen() {
+    document.getElementById('master-key-overlay').style.display = 'none';
+    document.querySelector('.app').style.display = 'flex';
+  }
+
+  function handleMasterKey(e) {
+    e.preventDefault();
+    const input = document.getElementById('master-key-input');
+    const errorEl = document.getElementById('master-key-error');
+    const key = input ? input.value : '';
+    
+    if (!key) return;
+    
+    // Verify master key against sentinel
+    const isValid = Utils.verifyKey(key);
+    if (!isValid) {
+      if (errorEl) {
+        errorEl.textContent = '❌ Incorrect Master Key. Decryption failed.';
+        errorEl.style.display = 'block';
+      }
+      if (input) {
+        input.value = '';
+        input.focus();
+      }
+      return;
+    }
+
+    if (errorEl) errorEl.style.display = 'none';
+    window.EKAYAN_MASTER_KEY = key;
+    if (input) input.value = '';
+
+    Utils.showToast('Vault unlocked. Loading decrypted records...', 'success');
+    
+    // Proceed with initialization
+    init();
   }
 
   function showLoginScreen() {
@@ -135,15 +183,7 @@ const App = (() => {
       document.getElementById('login-password').value = '';
 
       hideLoginScreen();
-      applyRolePermissions(session);
-
-      // Auto-flag inactive students on load
-      DataStore.autoFlagInactive(30);
-      // Seed demo data if empty
-      DataStore.seedDemoData();
-
-      renderShell();
-      navigate('dashboard');
+      init();
     } catch (err) {
       if (errorEl) {
         errorEl.textContent = err.message || 'Incorrect email or password. Please try again.';
@@ -238,7 +278,7 @@ const App = (() => {
     badge.style.display = flagged > 0 ? 'inline' : 'none';
   }
 
-  return { init, navigate, updateFlagBadge, handleLogin, handleLogout, setLoginPortal };
+  return { init, navigate, updateFlagBadge, handleLogin, handleLogout, setLoginPortal, handleMasterKey };
 })();
 
 // Start the app

@@ -4,6 +4,64 @@
 
 const Utils = (() => {
 
+  const SENTINEL_PLAINTEXT = 'EKAYAN_VAULT_VALID_2026';
+  const SENTINEL_STORAGE_KEY = 'eb_vault_sentinel';
+
+  /**
+   * Encrypts plaintext using AES and the Master Key.
+   */
+  function encryptData(plainText) {
+    if (!plainText) return plainText;
+    if (!window.EKAYAN_MASTER_KEY) throw new Error("Encryption failed: Master key missing");
+    return CryptoJS.AES.encrypt(plainText.toString(), window.EKAYAN_MASTER_KEY).toString();
+  }
+
+  /**
+   * Decrypts ciphertext using AES and the Master Key.
+   */
+  function decryptData(cipherText) {
+    if (!cipherText) return cipherText;
+    // If it's already plaintext (from local cache before encryption feature), return it.
+    // Basic heuristic: AES ciphertexts from CryptoJS are Base64 strings starting with 'U2FsdGVkX1'
+    if (!cipherText.startsWith('U2FsdGVkX1')) return cipherText;
+    
+    if (!window.EKAYAN_MASTER_KEY) return '[Locked]';
+    
+    try {
+      const bytes = CryptoJS.AES.decrypt(cipherText.toString(), window.EKAYAN_MASTER_KEY);
+      const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+      return decrypted || '[Locked]';
+    } catch (e) {
+      return '[Locked]';
+    }
+  }
+
+  /**
+   * Validates if a provided master key correctly unlocks the vault.
+   * Uses a persistent sentinel ciphertext in localStorage.
+   */
+  function verifyKey(keyCandidate) {
+    if (!keyCandidate) return false;
+    const existingSentinel = localStorage.getItem(SENTINEL_STORAGE_KEY);
+    if (!existingSentinel) {
+      // First time vault setup: create and save sentinel
+      try {
+        const encrypted = CryptoJS.AES.encrypt(SENTINEL_PLAINTEXT, keyCandidate).toString();
+        localStorage.setItem(SENTINEL_STORAGE_KEY, encrypted);
+        return true;
+      } catch (err) {
+        return false;
+      }
+    }
+    try {
+      const bytes = CryptoJS.AES.decrypt(existingSentinel, keyCandidate);
+      const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+      return decrypted === SENTINEL_PLAINTEXT;
+    } catch (err) {
+      return false;
+    }
+  }
+
   /**
    * Generate a unique student ID in format CF-YYYY-NNNN
    * Reads existing students to find the next sequential number
@@ -384,7 +442,10 @@ const Utils = (() => {
     debounce,
     escapeHtml,
     showToast,
-    showErrorDialog
+    showErrorDialog,
+    encryptData,
+    decryptData,
+    verifyKey
   };
 
 })();
