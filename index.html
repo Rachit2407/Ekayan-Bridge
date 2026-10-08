@@ -14,6 +14,8 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- CryptoJS for Zero-Trust Client-Side Encryption -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+  <!-- SheetJS (xlsx) for Excel and CSV import/export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="js/config.js"></script>
 
 </head>
@@ -51,8 +53,8 @@
         <button class="nav-item" onclick="document.getElementById('import-file').click()" id="nav-import">
           <span class="nav-item__icon">📥</span> Import Data
         </button>
-        <input type="file" id="import-file" accept=".json" style="display:none;"
-          onchange="DataStore.importData(this.files[0]).then(() => { App.navigate('dashboard'); this.value=''; })">
+        <input type="file" id="import-file" accept=".xlsx,.xls,.csv,.json" style="display:none;"
+          onchange="DataStore.importData(this.files[0]).then(() => { App.navigate('students'); this.value=''; })">
         <button class="nav-item nav-item--logout" onclick="App.handleLogout()" style="margin-top:8px;">
           <span class="nav-item__icon">🚪</span> Sign Out
         </button>

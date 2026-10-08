@@ -289,43 +289,216 @@ const DataStore = (() => {
     Utils.showToast('Data exported successfully!', 'success');
   }
 
-  function importData(file) {
+  /**
+   * Helper: Normalize string keys for flexible column matching
+   */
+  function normalizeHeader(str) {
+    if (!str) return '';
+    return str.toString().toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  /**
+   * Universal Importer: Supports Excel (.xlsx, .xls), CSV (.csv), and JSON backups.
+   * Handles missing fields safely, auto-generates IDs, encrypts records, and syncs to Supabase.
+   */
+  async function importData(file) {
+    if (!file) throw new Error('No file selected.');
+
+    const fileName = file.name.toLowerCase();
+    const isExcelOrCsv = fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv');
+    const isJson = fileName.endsWith('.json');
+
+    if (!isExcelOrCsv && !isJson) {
+      throw new Error('Unsupported file format. Please upload an Excel (.xlsx/.xls), CSV (.csv), or JSON file.');
+    }
+
+    if (!window.EKAYAN_MASTER_KEY) {
+      throw new Error('Vault is locked. Please unlock the database with the Master Key before importing records.');
+    }
+
+    if (isJson) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          try {
+            const data = JSON.parse(e.target.result);
+            if (!data.students || !Array.isArray(data.students)) {
+              throw new Error('Invalid JSON backup format: "students" array missing.');
+            }
+            
+            const existing = getAllStudents();
+            const existingIds = new Set(existing.map(s => s.id));
+            
+            for (const s of data.students) {
+              if (existingIds.has(s.id)) {
+                updateStudent(s.id, s);
+              } else {
+                saveStudent(s);
+              }
+              await syncStudentToSupabase(s);
+            }
+            
+            migrateStages();
+            addAuditLog('IMPORT_DATA', `Imported ${data.students.length} students from JSON backup.`);
+            Utils.showToast(`Imported ${data.students.length} students successfully!`, 'success');
+            resolve(data.students);
+          } catch (err) {
+            Utils.showToast('Failed to import JSON: ' + err.message, 'error');
+            reject(err);
+          }
+        };
+        reader.onerror = () => reject(new Error('Failed to read JSON file.'));
+        reader.readAsText(file);
+      });
+    }
+
+    // Excel or CSV file handling via SheetJS
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
-          const data = JSON.parse(e.target.result);
-          
-          if (!data.students || !Array.isArray(data.students)) {
-            throw new Error('Invalid backup file format');
+          if (typeof XLSX === 'undefined') {
+            throw new Error('SheetJS library is loading, please try again in a few seconds.');
           }
-          
-          // Merge or replace
-          localStorage.setItem(STUDENTS_KEY, JSON.stringify(data.students));
-          migrateStages();
-          localStorage.setItem(EVENTS_KEY, JSON.stringify(data.events || []));
-          if (data.settings) {
-            localStorage.setItem(SETTINGS_KEY, JSON.stringify(data.settings));
+
+          const arrayBuffer = e.target.result;
+          const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+          if (!rawRows || rawRows.length === 0) {
+            throw new Error('The uploaded spreadsheet is empty or has no data rows.');
           }
-          
-          addAuditLog('IMPORT_DATA', `Imported database containing ${data.students.length} students`);
-          
-          // Sync all imported data to Supabase
-          if (typeof supabase !== 'undefined' && supabase) {
-            data.students.forEach(s => syncStudentToSupabase(s));
-            (data.events || []).forEach(evt => syncEventToSupabase(evt));
+
+          let importedCount = 0;
+          const newStudents = [];
+
+          for (const row of rawRows) {
+            // Find key by normalized variants
+            const getVal = (...keys) => {
+              const normalizedKeys = keys.map(normalizeHeader);
+              for (const [k, v] of Object.entries(row)) {
+                if (normalizedKeys.includes(normalizeHeader(k))) {
+                  return v !== undefined && v !== null ? v.toString().trim() : '';
+                }
+              }
+              return '';
+            };
+
+            const name = getVal('name', 'studentname', 'fullname', 'student');
+            if (!name) continue; // Skip rows without a name
+
+            const village = getVal('village', 'city', 'location', 'town', 'address');
+            const contact = getVal('contact', 'phone', 'phonenumber', 'mobile', 'mobilenumber');
+            const email = getVal('email', 'emailaddress', 'mail');
+            const dob = getVal('dateofbirth', 'dob', 'birthdate');
+            const genderRaw = getVal('gender', 'sex').toLowerCase();
+            const gender = ['male', 'female', 'other'].includes(genderRaw) ? genderRaw : 'prefer_not_to_say';
+            const maritalRaw = getVal('maritalstatus', 'marital', 'married').toLowerCase();
+            const maritalStatus = ['single', 'married', 'divorced', 'widowed'].includes(maritalRaw) ? maritalRaw : 'prefer_not_to_say';
+            const courseName = getVal('coursename', 'course', 'degree', 'standard', 'class');
+            const courseYear = getVal('courseyear', 'year', 'classyear');
+            const schoolJob = getVal('schoolcollegejob', 'school', 'college', 'job', 'institution');
+            const stageRaw = getVal('programstage', 'stage', 'status').toLowerCase().replace(/[^a-z_]/g, '');
+            const validStages = ['enrolled', 'neev', 'disha', 'nirmaan', 'sampark', 'dropped_out'];
+            const programStage = validStages.includes(stageRaw) ? stageRaw : 'enrolled';
+            const parentName = getVal('parentguardianname', 'parentname', 'guardianname', 'fathername', 'mothername');
+            const parentContact = getVal('parentguardiancontact', 'parentcontact', 'parentphone', 'guardianphone');
+            const parentRel = getVal('parentguardianrelation', 'relation', 'relationship') || 'parent';
+            const consentRaw = getVal('consentgiven', 'consent', 'dpdpconsent').toLowerCase();
+            const consentGiven = ['yes', 'true', '1', 'y'].includes(consentRaw);
+
+            const studentObj = {
+              name,
+              village,
+              contact,
+              email,
+              dateOfBirth: dob,
+              gender,
+              maritalStatus,
+              courseName,
+              courseYear,
+              schoolCollegeJob: schoolJob,
+              programStage,
+              parentGuardianName: parentName,
+              parentGuardianContact: parentContact,
+              parentGuardianRelation: parentRel,
+              consentGiven,
+              consentDate: consentGiven ? new Date().toISOString().split('T')[0] : ''
+            };
+
+            const created = createStudent(studentObj);
+            newStudents.push(created);
+            importedCount++;
           }
-          
-          Utils.showToast(`Imported ${data.students.length} students successfully!`, 'success');
-          resolve(data);
+
+          if (importedCount === 0) {
+            throw new Error('No valid student rows found. Please ensure your spreadsheet has a "Name" column.');
+          }
+
+          addAuditLog('IMPORT_DATA', `Imported ${importedCount} students from ${fileName} (Encrypted via Master Key)`);
+          Utils.showToast(`✅ Successfully imported & encrypted ${importedCount} students from Excel!`, 'success');
+          resolve(newStudents);
         } catch (err) {
-          Utils.showToast('Failed to import: ' + err.message, 'error');
+          Utils.showToast('Excel/CSV Import error: ' + err.message, 'error');
           reject(err);
         }
       };
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsText(file);
+      reader.onerror = () => reject(new Error('Failed to read spreadsheet file.'));
+      reader.readAsArrayBuffer(file);
     });
+  }
+
+  /**
+   * Helper: Generates and downloads a pre-formatted Excel template for batch student uploads.
+   */
+  function downloadSampleExcelTemplate() {
+    if (typeof XLSX === 'undefined') {
+      Utils.showToast('Excel engine loading, please try again in a moment.', 'info');
+      return;
+    }
+
+    const sampleHeaders = [
+      {
+        'Full Name *': 'Anjali Verma',
+        'Village *': 'Rampur',
+        'Phone Number': '9876543210',
+        'Email': 'anjali.v@email.com',
+        'Date of Birth (YYYY-MM-DD)': '2005-04-12',
+        'Gender (Male/Female/Other)': 'Female',
+        'Marital Status': 'Single',
+        'Course Name': 'B.Sc. Nursing',
+        'Course Year (1st Year, 2nd Year, etc.)': '1st Year',
+        'School / College / Institution': 'Govt. Nursing College Jaipur',
+        'Program Stage (enrolled/neev/disha/nirmaan/sampark)': 'enrolled',
+        'Parent / Guardian Name': 'Ramesh Verma',
+        'Parent Contact': '9876500000',
+        'Consent Given (Yes/No)': 'Yes'
+      },
+      {
+        'Full Name *': 'Mohit Kumar',
+        'Village *': 'Kherli',
+        'Phone Number': '9123456780',
+        'Email': 'mohit.k@email.com',
+        'Date of Birth (YYYY-MM-DD)': '2004-09-20',
+        'Gender (Male/Female/Other)': 'Male',
+        'Marital Status': 'Single',
+        'Course Name': 'B.Com',
+        'Course Year (1st Year, 2nd Year, etc.)': '2nd Year',
+        'School / College / Institution': 'Commerce College',
+        'Program Stage (enrolled/neev/disha/nirmaan/sampark)': 'neev',
+        'Parent / Guardian Name': 'Suresh Kumar',
+        'Parent Contact': '9123400000',
+        'Consent Given (Yes/No)': 'Yes'
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleHeaders);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Students_Template');
+    XLSX.writeFile(workbook, 'Ekayan_Student_Import_Template.xlsx');
+    Utils.showToast('Sample Excel template downloaded!', 'success');
   }
 
   // ---- Supabase Sync Helpers ----
@@ -776,7 +949,8 @@ const DataStore = (() => {
     getAllAuditLogs,
     addAuditLog,
     reencryptAllStudents,
-    rotateMasterKey
+    rotateMasterKey,
+    downloadSampleExcelTemplate
   };
 
 })();

@@ -70,7 +70,8 @@ const StudentList = (() => {
         </div>
         
         <div style="display:flex; gap:8px; margin-left:auto;">
-          <button class="btn" onclick="StudentList.exportToCSV()">📤 Export CSV</button>
+          <button class="btn" onclick="DataStore.downloadSampleExcelTemplate()" title="Download a pre-formatted Excel template for importing students" style="font-size:0.85rem;">📥 Excel Template</button>
+          <button class="btn" onclick="StudentList.exportToCSV()" style="font-size:0.85rem;">📤 Export CSV</button>
           <button class="btn btn--primary" onclick="Forms.showAddStudent()">+ Add Student</button>
         </div>
       </div>
