@@ -149,7 +149,8 @@
             <button type="button" onclick="const i=document.getElementById('master-key-input'); i.type = i.type==='password'?'text':'password'; this.textContent=i.type==='password'?'👁️':'🙈';" style="position:absolute; right:10px; background:none; border:none; cursor:pointer; font-size:1rem; opacity:0.7; padding:2px;">👁️</button>
           </div>
         </div>
-        <button type="submit" class="btn btn--primary" style="margin-top:24px; width:100%; padding:12px; font-size:1rem; font-weight:600; display:flex; justify-content:center; align-items:center;">Decrypt & Enter Dashboard</button>
+        <button type="submit" class="btn btn--primary" style="margin-top:20px; width:100%; padding:12px; font-size:1rem; font-weight:600; display:flex; justify-content:center; align-items:center;">Decrypt & Enter Dashboard</button>
+        <button type="button" onclick="App.cancelMasterKeyUnlock()" class="btn" style="margin-top:10px; width:100%; padding:10px; font-size:0.85rem; background:transparent; border:1px solid rgba(255,255,255,0.1); color:var(--text-secondary);">← Sign in with different account</button>
       </form>
     </div>
   </div>

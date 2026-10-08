@@ -35,11 +35,18 @@ const App = (() => {
   function showMasterKeyScreen() {
     document.getElementById('master-key-overlay').style.display = 'flex';
     document.querySelector('.app').style.display = 'none';
+    hideLoginScreen();
   }
 
   function hideMasterKeyScreen() {
     document.getElementById('master-key-overlay').style.display = 'none';
-    document.querySelector('.app').style.display = 'flex';
+  }
+
+  async function cancelMasterKeyUnlock() {
+    await DataStore.logout();
+    hideMasterKeyScreen();
+    showLoginScreen();
+    Utils.showToast('Returned to sign-in screen.', 'info');
   }
 
   function handleMasterKey(e) {
@@ -278,7 +285,7 @@ const App = (() => {
     badge.style.display = flagged > 0 ? 'inline' : 'none';
   }
 
-  return { init, navigate, updateFlagBadge, handleLogin, handleLogout, setLoginPortal, handleMasterKey };
+  return { init, navigate, updateFlagBadge, handleLogin, handleLogout, setLoginPortal, handleMasterKey, cancelMasterKeyUnlock };
 })();
 
 // Start the app
