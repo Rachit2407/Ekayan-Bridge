@@ -903,7 +903,7 @@ const DataStore = (() => {
       throw new Error('New master key must be at least 6 characters long.');
     }
     // Verify current key first
-    const isCurrentValid = Utils.verifyKey(currentKeyCandidate);
+    const isCurrentValid = await Utils.verifyKey(currentKeyCandidate);
     if (!isCurrentValid) {
       throw new Error('Verification failed: Current Master Key is incorrect.');
     }
@@ -912,7 +912,7 @@ const DataStore = (() => {
     
     // Switch active key to newKey
     window.EKAYAN_MASTER_KEY = newKey;
-    Utils.updateMasterKeySentinel(newKey);
+    await Utils.updateMasterKeySentinel(newKey);
 
     let count = 0;
     for (const student of students) {

@@ -49,36 +49,50 @@ const App = (() => {
     Utils.showToast('Returned to sign-in screen.', 'info');
   }
 
-  function handleMasterKey(e) {
+  async function handleMasterKey(e) {
     e.preventDefault();
     const input = document.getElementById('master-key-input');
     const errorEl = document.getElementById('master-key-error');
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn ? submitBtn.textContent : 'Decrypt & Enter Dashboard';
     const key = input ? input.value : '';
     
     if (!key) return;
     
-    // Verify master key against sentinel
-    const isValid = Utils.verifyKey(key);
-    if (!isValid) {
-      if (errorEl) {
-        errorEl.textContent = '❌ Incorrect Master Key. Decryption failed.';
-        errorEl.style.display = 'block';
-      }
-      if (input) {
-        input.value = '';
-        input.focus();
-      }
-      return;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Verifying Key...';
     }
 
-    if (errorEl) errorEl.style.display = 'none';
-    window.EKAYAN_MASTER_KEY = key;
-    if (input) input.value = '';
+    try {
+      // Verify master key against cloud/local sentinel
+      const isValid = await Utils.verifyKey(key);
+      if (!isValid) {
+        if (errorEl) {
+          errorEl.textContent = '❌ Incorrect Master Key. Decryption failed.';
+          errorEl.style.display = 'block';
+        }
+        if (input) {
+          input.value = '';
+          input.focus();
+        }
+        return;
+      }
 
-    Utils.showToast('Vault unlocked. Loading decrypted records...', 'success');
-    
-    // Proceed with initialization
-    init();
+      if (errorEl) errorEl.style.display = 'none';
+      window.EKAYAN_MASTER_KEY = key;
+      if (input) input.value = '';
+
+      Utils.showToast('Vault unlocked. Loading decrypted records...', 'success');
+      
+      // Proceed with initialization
+      init();
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
+    }
   }
 
   function showLoginScreen() {
